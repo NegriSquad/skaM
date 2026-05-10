@@ -9,13 +9,14 @@
 */
 
 const firebaseConfig = {
-    apiKey: "ВАШ_API_KEY",
-    authDomain: "ВАШ_ПРОЕКТ.firebaseapp.com",
-    databaseURL: "https://ВАШ_ПРОЕКТ.firebaseio.com",
-    projectId: "ВАШ_ПРОЕКТ",
-    storageBucket: "ВАШ_ПРОЕКТ.appspot.com",
-    messagingSenderId: "ВАШ_ID",
-    appId: "ВАШ_APP_ID"
+    apiKey: "AIzaSyD3NEXunS2PQPVQ3nDS27Nk4JIG3xajyVM",
+  authDomain: "messendger-71e53.firebaseapp.com",
+  databaseURL: "https://messendger-71e53-default-rtdb.firebaseio.com",
+  projectId: "messendger-71e53",
+  storageBucket: "messendger-71e53.firebasestorage.app",
+  messagingSenderId: "1010287168963",
+  appId: "1:1010287168963:web:15868f94480bb833414176",
+  measurementId: "G-6RYMEGSKNM"
 };
 
 let db, messagesRef, typingRef;
