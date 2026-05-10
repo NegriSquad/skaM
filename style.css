@@ -1,310 +1,204 @@
-// ============================================================
-// DARKCHAT - с авторизацией по паролю, удалением и копированием сообщений
-// ============================================================
-
-/* ----------------- ИНСТРУКЦИЯ FIREBASE -----------------
-   1. Создайте проект в Firebase Console.
-   2. В Realtime Database установите правила: { "rules": { ".read": true, ".write": true } }
-   3. Скопируйте свой конфиг (apiKey, databaseURL и т.д.) и вставьте ниже.
-   4. ВАЖНО: Пароли хранятся в открытом виде в узле 'users' (демо-режим).
-*/
-
-const firebaseConfig = {
-    apiKey: "AIzaSyD3NEXunS2PQPVQ3nDS27Nk4JIG3xajyVM",
-  authDomain: "messendger-71e53.firebaseapp.com",
-  databaseURL: "https://messendger-71e53-default-rtdb.firebaseio.com",
-  projectId: "messendger-71e53",
-  storageBucket: "messendger-71e53.firebasestorage.app",
-  messagingSenderId: "1010287168963",
-  appId: "1:1010287168963:web:15868f94480bb833414176",
-  measurementId: "G-6RYMEGSKNM"
-};
-
-let db, usersRef, messagesRef, typingRef;
-let currentUser = null;
-let messagesListener = null;
-let typingTimeout = null;
-
-// DOM
-const loginScreen = document.getElementById('loginScreen');
-const chatScreen = document.getElementById('chatScreen');
-const nicknameInput = document.getElementById('nicknameInput');
-const passwordInput = document.getElementById('passwordInput');
-const loginBtn = document.getElementById('loginBtn');
-const logoutBtn = document.getElementById('logoutBtn');
-const messagesContainer = document.getElementById('messagesContainer');
-const messageInput = document.getElementById('messageInput');
-const sendBtn = document.getElementById('sendBtn');
-const currentUsernameSpan = document.getElementById('currentUsernameDisplay');
-const typingDiv = document.getElementById('typingIndicatorContainer');
-const typingTextSpan = document.getElementById('typingText');
-const charCounter = document.getElementById('charCounter');
-
-// Инициализация Firebase
-let firebaseReady = false;
-try {
-    if (firebaseConfig.apiKey !== "ВАШ_API_KEY") {
-        firebase.initializeApp(firebaseConfig);
-        db = firebase.database();
-        usersRef = db.ref('users');
-        messagesRef = db.ref('messages');
-        typingRef = db.ref('typing');
-        firebaseReady = true;
-        console.log("✅ Firebase готова");
-    } else {
-        alert("⚠️ Настройте Firebase в script.js (укажите apiKey и databaseURL)");
-    }
-} catch(e) { console.error(e); }
-
-// Вспомогательные функции
-function escapeHtml(str) {
-    if (!str) return '';
-    return str.replace(/[&<>]/g, function(m) {
-        if (m === '&') return '&amp;';
-        if (m === '<') return '&lt;';
-        if (m === '>') return '&gt;';
-        return m;
-    });
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+    --bg-primary: #0f0f12;
+    --bg-secondary: #1e1f24;
+    --bg-tertiary: #2b2d36;
+    --bg-elevated: #232429;
+    --accent-color: #5865f2;
+    --accent-hover: #4752c4;
+    --text-primary: #f2f3f5;
+    --text-secondary: #b5bac1;
+    --text-muted: #7d828c;
+    --border-light: #2c2f36;
+    --danger: #ed4245;
+    --success: #23a55a;
+    --radius-sm: 12px;
+    --radius-md: 16px;
 }
-
-function formatTime(ts) {
-    return new Date(ts).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: radial-gradient(circle at 10% 20%, #18191e, #0a0a0c);
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-primary);
 }
-
-function formatDateGroup(ts) {
-    const d = new Date(ts);
-    const today = new Date();
-    if (d.toDateString() === today.toDateString()) return "Сегодня";
-    const yesterday = new Date(today); yesterday.setDate(today.getDate()-1);
-    if (d.toDateString() === yesterday.toDateString()) return "Вчера";
-    return d.toLocaleDateString('ru-RU');
+@import url('https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap');
+.app-wrapper {
+    width: 100%;
+    max-width: 1400px;
+    height: 95vh;
+    background: var(--bg-primary);
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    display: flex;
+    flex-direction: column;
 }
-
-// Авторизация / регистрация с паролем
-async function handleAuth() {
-    if (!firebaseReady) return alert("Firebase не инициализирована");
-    const nick = nicknameInput.value.trim();
-    const pass = passwordInput.value.trim();
-    if (nick.length < 2 || pass.length === 0) return alert("Ник (минимум 2 символа) и пароль обязательны");
-    
-    const snapshot = await usersRef.child(nick).once('value');
-    const userData = snapshot.val();
-    if (userData) {
-        // Существующий пользователь – проверяем пароль
-        if (userData.password === pass) {
-            currentUser = { nickname: nick };
-            localStorage.setItem("darkchat_user", nick);
-            localStorage.setItem("darkchat_pass", pass); // для авто-входа
-            showChat();
-        } else {
-            alert("Неверный пароль!");
-        }
-    } else {
-        // Регистрация нового пользователя
-        await usersRef.child(nick).set({ password: pass, createdAt: Date.now() });
-        currentUser = { nickname: nick };
-        localStorage.setItem("darkchat_user", nick);
-        localStorage.setItem("darkchat_pass", pass);
-        showChat();
-    }
+/* ЭКРАН ВХОДА */
+.login-screen {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15,15,18,0.85);
+    backdrop-filter: blur(12px);
 }
-
-function showChat() {
-    loginScreen.classList.add('hidden');
-    chatScreen.classList.remove('hidden');
-    currentUsernameSpan.innerText = currentUser.nickname;
-    loadMessages();
-    listenTyping();
-    messageInput.value = "";
-    updateCharCounter();
-    messageInput.focus();
+.login-card {
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    padding: 2rem;
+    width: 90%;
+    max-width: 440px;
+    text-align: center;
+    border: 1px solid rgba(88,101,242,0.2);
 }
-
-function logout() {
-    if (messagesListener) messagesListener.off();
-    if (typingRef && currentUser) typingRef.child(currentUser.nickname).remove();
-    currentUser = null;
-    localStorage.removeItem("darkchat_user");
-    localStorage.removeItem("darkchat_pass");
-    loginScreen.classList.remove('hidden');
-    chatScreen.classList.add('hidden');
-    messagesContainer.innerHTML = `<div class="empty-state" id="emptyState"><div class="empty-emoji">💬</div><p>Нет сообщений</p></div>`;
+.logo-icon { font-size: 3rem; margin-bottom: 0.5rem; }
+.login-card h1 { font-size: 2rem; margin-bottom: 0.25rem; }
+.input-group { text-align: left; margin-bottom: 1.5rem; }
+.input-group label { display: block; font-size: 0.8rem; margin-bottom: 0.4rem; color: var(--text-secondary); }
+#nicknameInput {
+    width: 100%;
+    padding: 12px 14px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    color: white;
+    font-size: 1rem;
 }
-
-// Рендер сообщений с кнопками "Копировать" и "Удалить" (удаление только для своих)
-function renderMessages(messagesArray) {
-    if (!messagesContainer) return;
-    const wasAtBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight < 50;
-    const children = [...messagesContainer.children];
-    children.forEach(c => { if (c.id !== 'emptyState') c.remove(); });
-    const emptyDiv = document.getElementById('emptyState');
-    if (!messagesArray.length) {
-        if (emptyDiv) emptyDiv.classList.remove('hidden');
-        return;
-    }
-    if (emptyDiv) emptyDiv.classList.add('hidden');
-    const sorted = [...messagesArray].sort((a,b) => a.timestamp - b.timestamp);
-    let lastDate = null;
-    sorted.forEach(msg => {
-        const dateLabel = formatDateGroup(msg.timestamp);
-        if (lastDate !== dateLabel) {
-            const divDate = document.createElement('div');
-            divDate.className = 'date-divider';
-            divDate.innerHTML = `<span>${dateLabel}</span>`;
-            messagesContainer.appendChild(divDate);
-            lastDate = dateLabel;
-        }
-        const isOwn = (currentUser && msg.sender === currentUser.nickname);
-        const msgDiv = document.createElement('div');
-        msgDiv.className = `message-item ${isOwn ? 'own-message' : ''}`;
-        msgDiv.setAttribute('data-msg-id', msg.id);
-        msgDiv.innerHTML = `
-            <div class="message-bubble">
-                <div class="message-header">
-                    <span class="message-author">${escapeHtml(msg.sender)}</span>
-                    <span class="message-time">${formatTime(msg.timestamp)}</span>
-                </div>
-                <div class="message-text">${escapeHtml(msg.text)}</div>
-            </div>
-            <div class="message-actions">
-                <button class="action-btn copy-btn" data-text="${escapeHtml(msg.text).replace(/"/g, '&quot;')}">📋 Копировать</button>
-                ${isOwn ? `<button class="action-btn delete-btn" data-id="${msg.id}">🗑️ Удалить</button>` : ''}
-            </div>
-        `;
-        messagesContainer.appendChild(msgDiv);
-    });
-    // Добавляем обработчики для кнопок
-    document.querySelectorAll('.copy-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const text = btn.getAttribute('data-text');
-            navigator.clipboard.writeText(text).then(() => {
-                btn.textContent = '✅ Скопировано';
-                setTimeout(() => { if(btn) btn.textContent = '📋 Копировать'; }, 1000);
-            });
-        });
-    });
-    document.querySelectorAll('.delete-btn').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const msgId = btn.getAttribute('data-id');
-            if (confirm('Удалить сообщение?')) {
-                await messagesRef.child(msgId).remove();
-            }
-        });
-    });
-    if (wasAtBottom) messagesContainer.scrollTo({ top: messagesContainer.scrollHeight, behavior: 'smooth' });
+.btn-primary {
+    width: 100%;
+    background: var(--accent-color);
+    border: none;
+    padding: 12px;
+    border-radius: 40px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.2s;
 }
+.btn-primary:hover { background: var(--accent-hover); transform: scale(1.02);}
+.security-note { font-size: 0.7rem; color: var(--text-muted); margin-top: 1rem; }
 
-// Загрузка сообщений
-function loadMessages() {
-    if (!messagesRef) return;
-    if (messagesListener) messagesListener.off();
-    messagesListener = messagesRef.orderByChild('timestamp').limitToLast(50).on('value', (snap) => {
-        const data = snap.val();
-        const list = [];
-        if (data) {
-            Object.keys(data).forEach(key => list.push({ id: key, ...data[key] }));
-        }
-        renderMessages(list);
-    });
+/* ЧАТ */
+.chat-screen { display: flex; flex-direction: column; height: 100%; }
+.hidden { display: none !important; }
+.chat-header {
+    background: var(--bg-secondary);
+    padding: 0.8rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-light);
 }
+.user-panel { display: flex; gap: 12px; background: var(--bg-tertiary); padding: 5px 15px; border-radius: 40px; align-items: center; }
+.current-user { display: flex; gap: 8px; align-items: center; }
+.icon-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1.2rem; transition: 0.2s; }
+.icon-btn:hover { color: var(--danger); }
+.messages-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.message-item {
+    display: flex;
+    flex-direction: column;
+    max-width: 80%;
+    width: fit-content;
+    position: relative;
+}
+.message-item.own-message { align-self: flex-end; align-items: flex-end; }
+.message-bubble {
+    background: var(--bg-elevated);
+    padding: 10px 14px;
+    border-radius: 20px;
+    border-top-left-radius: 4px;
+}
+.own-message .message-bubble { background: var(--accent-color); border-top-right-radius: 4px; border-top-left-radius: 20px; }
+.message-header { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.message-author { font-weight: 700; font-size: 0.85rem; color: var(--accent-color); }
+.own-message .message-author { color: #ffffffcc; }
+.message-time { font-size: 0.65rem; color: var(--text-muted); }
+.message-text { font-size: 0.95rem; word-break: break-word; white-space: pre-wrap; }
 
-// Отправка
-async function sendMessage() {
-    if (!currentUser || !messageInput.value.trim()) return;
-    const text = messageInput.value.trim();
-    await messagesRef.push({
-        sender: currentUser.nickname,
-        text: text,
-        timestamp: Date.now()
-    });
-    messageInput.value = "";
-    updateCharCounter();
-    clearTypingStatus();
+/* КНОПКИ КОПИРОВАНИЯ / УДАЛЕНИЯ */
+.message-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+    justify-content: flex-end;
+    opacity: 0;
+    transition: opacity 0.2s;
 }
+.message-item:hover .message-actions { opacity: 1; }
+.action-btn {
+    background: var(--bg-tertiary);
+    border: none;
+    border-radius: 30px;
+    padding: 4px 10px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: 0.1s;
+}
+.action-btn:hover { background: var(--accent-color); color: white; }
+.delete-btn:hover { background: var(--danger); color: white; }
 
-// Индикатор печати
-function updateTypingStatus(isTyping) {
-    if (!currentUser || !typingRef) return;
-    if (isTyping) {
-        typingRef.child(currentUser.nickname).set({ name: currentUser.nickname, timestamp: Date.now() });
-        if (typingTimeout) clearTimeout(typingTimeout);
-        typingTimeout = setTimeout(() => typingRef.child(currentUser.nickname).remove(), 1500);
-    } else {
-        typingRef.child(currentUser.nickname).remove();
-    }
+.typing-indicator {
+    background: var(--bg-tertiary);
+    margin: 6px 18px;
+    padding: 6px 12px;
+    border-radius: 30px;
+    width: fit-content;
+    display: flex;
+    gap: 8px;
+    font-size: 0.8rem;
 }
-function clearTypingStatus() {
-    if (typingRef && currentUser) typingRef.child(currentUser.nickname).remove();
-    if (typingTimeout) clearTimeout(typingTimeout);
+.input-area {
+    background: var(--bg-secondary);
+    padding: 12px 20px;
+    border-top: 1px solid var(--border-light);
 }
-function listenTyping() {
-    if (!typingRef) return;
-    typingRef.on('value', (snap) => {
-        const users = snap.val();
-        if (!users || Object.keys(users).length === 0) {
-            typingDiv.classList.add('hidden');
-            return;
-        }
-        const typingList = Object.keys(users).filter(u => u !== currentUser?.nickname);
-        if (typingList.length === 0) { typingDiv.classList.add('hidden'); return; }
-        let text = '';
-        if (typingList.length === 1) text = `${typingList[0]} печатает...`;
-        else if (typingList.length === 2) text = `${typingList[0]} и ${typingList[1]} печатают...`;
-        else text = `Несколько человек печатают...`;
-        typingTextSpan.innerText = text;
-        typingDiv.classList.remove('hidden');
-    });
+.message-input-wrapper {
+    display: flex;
+    gap: 12px;
+    background: var(--bg-tertiary);
+    border-radius: 60px;
+    padding: 6px 12px;
 }
-
-function updateCharCounter() {
-    charCounter.innerText = `${messageInput.value.length}/500`;
+#messageInput {
+    flex: 1;
+    background: transparent;
+    border: none;
+    padding: 12px 8px;
+    color: white;
+    font-size: 1rem;
+    outline: none;
 }
-
-// Восстановление сессии
-async function tryAutoLogin() {
-    const savedNick = localStorage.getItem("darkchat_user");
-    const savedPass = localStorage.getItem("darkchat_pass");
-    if (savedNick && savedPass && firebaseReady) {
-        const snap = await usersRef.child(savedNick).once('value');
-        if (snap.val() && snap.val().password === savedPass) {
-            currentUser = { nickname: savedNick };
-            showChat();
-            return true;
-        }
-    }
-    return false;
+.send-button {
+    background: var(--accent-color);
+    border: none;
+    width: 44px;
+    border-radius: 50%;
+    cursor: pointer;
+    color: white;
+    font-size: 1.2rem;
 }
-
-// События
-loginBtn.addEventListener('click', handleAuth);
-logoutBtn.addEventListener('click', logout);
-sendBtn.addEventListener('click', sendMessage);
-messageInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') sendMessage(); });
-messageInput.addEventListener('input', () => {
-    updateCharCounter();
-    if (currentUser) {
-        updateTypingStatus(true);
-        clearTimeout(typingTimeout);
-        typingTimeout = setTimeout(() => updateTypingStatus(false), 1200);
-    }
-});
-messageInput.addEventListener('blur', () => updateTypingStatus(false));
-messagesContainer.addEventListener('scroll', () => {
-    const { scrollTop, scrollHeight, clientHeight } = messagesContainer;
-    window._isAtBottom = scrollHeight - scrollTop - clientHeight < 30;
-});
-
-// Запуск
-window.addEventListener('DOMContentLoaded', async () => {
-    if (firebaseReady) {
-        const auto = await tryAutoLogin();
-        if (!auto) {
-            loginScreen.classList.remove('hidden');
-            chatScreen.classList.add('hidden');
-        }
-    } else {
-        loginScreen.classList.remove('hidden');
-    }
-});
+.input-footer {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 6px;
+}
+.date-divider { text-align: center; margin: 12px 0; font-size: 0.7rem; }
+.date-divider span { background: var(--bg-tertiary); padding: 2px 12px; border-radius: 40px; }
+.empty-state { text-align: center; margin-top: 3rem; opacity: 0.7; }
+.empty-emoji { font-size: 3rem; }
+@media (max-width: 650px) { .message-item { max-width: 92%; } }
