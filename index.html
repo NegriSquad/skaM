@@ -2,79 +2,123 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>DarkChat | Личные сообщения</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
+    <title>DarkChat | Приватные сообщения</title>
     <link rel="stylesheet" href="style.css">
+    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 </head>
 <body>
-    <div class="app-wrapper">
-        <!-- ЭКРАН АВТОРИЗАЦИИ -->
-        <div id="authScreen" class="screen auth">
-            <div class="auth-card">
-                <div class="logo">💬 DarkChat</div>
-                <div class="tabs">
-                    <button id="tabLogin" class="tab active">Вход</button>
-                    <button id="tabRegister" class="tab">Регистрация</button>
+<div class="app-wrapper" id="appWrapper">
+
+    <!-- ==================== ЭКРАН ВХОДА ==================== -->
+    <div id="loginScreen" class="screen">
+        <div class="auth-card">
+            <div class="logo-icon">💬✨</div>
+            <h1>Dark<span style="color:#5865f2;">Chat</span></h1>
+            <p class="subtitle">Войдите в аккаунт</p>
+            <div class="input-group">
+                <label>Email</label>
+                <input type="email" id="loginEmail" placeholder="example@mail.ru">
+            </div>
+            <div class="input-group">
+                <label>Пароль</label>
+                <input type="password" id="loginPassword" placeholder="••••••">
+            </div>
+            <button id="doLoginBtn" class="btn-primary">Войти</button>
+            <p class="switch-action">Нет аккаунта? <span id="showRegisterBtn">Создать</span></p>
+        </div>
+    </div>
+
+    <!-- ==================== ЭКРАН РЕГИСТРАЦИИ ==================== -->
+    <div id="registerScreen" class="screen hidden">
+        <div class="auth-card">
+            <div class="logo-icon">🚀</div>
+            <h1>Регистрация</h1>
+            <div class="input-group">
+                <label>Email</label>
+                <input type="email" id="regEmail" placeholder="you@example.com">
+            </div>
+            <div class="input-group">
+                <label>@username (уникальный)</label>
+                <input type="text" id="regUsername" placeholder="ivan" maxlength="24">
+                <div class="input-hint">Только латиница, цифры, _</div>
+            </div>
+            <div class="input-group">
+                <label>Отображаемое имя</label>
+                <input type="text" id="regNickname" placeholder="Иван Петров">
+            </div>
+            <div class="input-group">
+                <label>Пароль</label>
+                <input type="password" id="regPassword" placeholder="минимум 6 символов">
+            </div>
+            <button id="doRegisterBtn" class="btn-primary">Зарегистрироваться</button>
+            <p class="switch-action">Уже есть аккаунт? <span id="showLoginFromRegBtn">Войти</span></p>
+        </div>
+    </div>
+
+    <!-- ==================== ОСНОВНОЙ ИНТЕРФЕЙС (СПИСОК ДИАЛОГОВ) ==================== -->
+    <div id="mainAppScreen" class="chats-layout hidden">
+        <!-- Левая панель: диалоги и поиск -->
+        <div class="chats-sidebar">
+            <div class="sidebar-header">
+                <div class="user-info">
+                    <span class="user-avatar">👤</span>
+                    <span id="sidebarUsername">@user</span>
                 </div>
-                <!-- Форма входа -->
-                <div id="loginForm" class="form">
-                    <input type="text" id="loginUsername" placeholder="Никнейм" autocomplete="off">
-                    <input type="password" id="loginPassword" placeholder="Пароль">
-                    <button id="btnLogin" class="btn-primary">Войти</button>
-                </div>
-                <!-- Форма регистрации -->
-                <div id="registerForm" class="form hidden">
-                    <input type="text" id="regUsername" placeholder="Никнейм (от 3 символов)">
-                    <input type="password" id="regPassword" placeholder="Пароль">
-                    <button id="btnRegister" class="btn-primary">Зарегистрироваться</button>
-                </div>
-                <div class="info">🔐 Пароли хранятся в открытом виде (учебный проект)</div>
+                <button id="globalLogoutBtn" class="icon-btn" title="Выйти">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                </button>
+            </div>
+            <div class="search-area">
+                <input type="text" id="searchUserInput" placeholder="Поиск по @username...">
+                <button id="searchUserBtn" class="search-btn">🔍</button>
+            </div>
+            <div id="searchResults" class="search-results hidden"></div>
+            <div class="dialogs-header">Диалоги</div>
+            <div id="dialogsList" class="dialogs-list">
+                <div class="empty-dialogs">Нет диалогов</div>
             </div>
         </div>
 
-        <!-- ОСНОВНОЙ ЭКРАН (ДВЕ КОЛОНКИ) -->
-        <div id="mainScreen" class="screen main hidden">
-            <!-- Левая панель: пользователи и чаты -->
-            <div class="sidebar">
-                <div class="sidebar-header">
-                    <div class="user-info">
-                        <span>👤</span>
-                        <span id="currentUserLabel"></span>
-                    </div>
-                    <button id="logoutBtnMain" class="icon-btn" title="Выйти">🚪</button>
+        <!-- Правая область: текущий чат -->
+        <div class="chat-area">
+            <div class="chat-header" id="chatHeader">
+                <div class="header-left">
+                    <button id="backToDialogsBtn" class="mobile-back hidden">←</button>
+                    <h2 id="currentChatTitle">Выберите диалог</h2>
                 </div>
-                <div class="search-box">
-                    <input type="text" id="searchUserInput" placeholder="Поиск пользователей...">
+                <div class="online-status-indicator" id="chatOnlineBadge" style="display: none;">
+                    <span class="pulse-dot"></span>
+                    <span>онлайн</span>
                 </div>
-                <div class="section-title">Все пользователи</div>
-                <div class="users-list" id="usersList"></div>
-                <div class="section-title">Мои диалоги</div>
-                <div class="chats-list" id="chatsList"></div>
             </div>
-            <!-- Правая панель: выбранный чат -->
-            <div class="chat-area">
-                <div class="chat-header" id="chatAreaHeader">
-                    <span id="chatWithName">Выберите чат</span>
+            <div class="messages-container" id="messagesContainer">
+                <div class="empty-state" id="emptyState">
+                    <div class="empty-emoji">💬</div>
+                    <p>Напишите первое сообщение</p>
                 </div>
-                <div class="messages-container" id="messagesContainer">
-                    <div class="empty-chat">👈 Нажмите на пользователя слева</div>
+            </div>
+            <div id="typingIndicatorContainer" class="typing-indicator hidden">
+                <div class="typing-dots"><span></span><span></span><span></span></div>
+                <span id="typingText"></span>
+            </div>
+            <div class="input-area">
+                <div class="message-input-wrapper">
+                    <input type="text" id="messageInput" placeholder="Введите сообщение..." autocomplete="off" maxlength="500">
+                    <button id="sendBtn" class="send-button">📩</button>
                 </div>
-                <div class="input-area" id="inputPanel" style="display: none;">
-                    <div class="message-input-wrapper">
-                        <input type="text" id="messageInput" placeholder="Сообщение... (@ для упоминания)">
-                        <button id="sendMessageBtn" class="send-button">➤</button>
-                    </div>
-                    <div id="mentionSuggestions" class="mention-suggestions hidden"></div>
-                    <div class="input-footer">
-                        <span>↵ Enter</span>
-                        <span id="charCount">0/500</span>
-                    </div>
+                <div class="input-footer">
+                    <span>↵ Enter</span>
+                    <span id="charCounter">0/500</span>
                 </div>
             </div>
         </div>
     </div>
-    <script src="script.js"></script>
+</div>
+
+<script src="script.js"></script>
 </body>
 </html>
