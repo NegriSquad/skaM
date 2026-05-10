@@ -1,4 +1,4 @@
-// ==================== КОНФИГ FIREBASE (ваши данные) ====================
+// ==================== КОНФИГ FIREBASE (ВАШИ ДАННЫЕ) ====================
 const firebaseConfig = {
     apiKey: "AIzaSyD3NEXunS2PQPVQ3nDS27Nk4JIG3xajyVM",
     authDomain: "messendger-71e53.firebaseapp.com",
@@ -9,50 +9,29 @@ const firebaseConfig = {
     appId: "1:1010287168963:web:15868f94480bb833414176"
 };
 
+// Инициализация Firebase (глобально, вне DOMContentLoaded, чтобы SDK был готов)
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.database();
 
 // Глобальные переменные
-let currentUser = null;           // объект Firebase User
-let currentUserData = null;       // { username, nickname, uid }
-let activeChatId = null;           // текущий открытый диалог (chatId)
-let activeChatPartner = null;      // данные собеседника
+let currentUser = null;
+let currentUserData = null;
+let activeChatId = null;
+let activeChatPartner = null;
 let messagesListener = null;
 let typingListener = null;
 let typingTimeout = null;
 let isAtBottom = true;
 
-// DOM элементы (авторизация)
-const loginScreen = document.getElementById('loginScreen');
-const registerScreen = document.getElementById('registerScreen');
-const mainAppScreen = document.getElementById('mainAppScreen');
-const doLoginBtn = document.getElementById('doLoginBtn');
-const loginEmail = document.getElementById('loginEmail');
-const loginPassword = document.getElementById('loginPassword');
-const showRegisterBtn = document.getElementById('showRegisterBtn');
-const showLoginFromRegBtn = document.getElementById('showLoginFromRegBtn');
-const doRegisterBtn = document.getElementById('doRegisterBtn');
-const regEmail = document.getElementById('regEmail');
-const regUsername = document.getElementById('regUsername');
-const regNickname = document.getElementById('regNickname');
-const regPassword = document.getElementById('regPassword');
-const globalLogoutBtn = document.getElementById('globalLogoutBtn');
-const sidebarUsername = document.getElementById('sidebarUsername');
-
-// DOM элементы (диалоги и чат)
-const dialogsList = document.getElementById('dialogsList');
-const searchUserInput = document.getElementById('searchUserInput');
-const searchUserBtn = document.getElementById('searchUserBtn');
-const searchResults = document.getElementById('searchResults');
-const messagesContainer = document.getElementById('messagesContainer');
-const messageInput = document.getElementById('messageInput');
-const sendBtn = document.getElementById('sendBtn');
-const charCounterSpan = document.getElementById('charCounter');
-const typingIndicator = document.getElementById('typingIndicatorContainer');
-const typingText = document.getElementById('typingText');
-const currentChatTitle = document.getElementById('currentChatTitle');
-const backToDialogsBtn = document.getElementById('backToDialogsBtn');
+// DOM элементы (будут заполнены после загрузки DOM)
+let loginScreen, registerScreen, mainAppScreen;
+let doLoginBtn, loginEmail, loginPassword, showRegisterBtn;
+let doRegisterBtn, regEmail, regUsername, regNickname, regPassword, showLoginFromRegBtn;
+let globalLogoutBtn, sidebarUsername;
+let dialogsList, searchUserInput, searchUserBtn, searchResults;
+let messagesContainer, messageInput, sendBtn, charCounterSpan;
+let typingIndicator, typingText, currentChatTitle, backToDialogsBtn;
 
 // ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
 function escapeHtml(str) {
@@ -87,17 +66,22 @@ function autoScroll() {
     }
 }
 
-// ==================== РАБОТА С ЧАТОМ (СООБЩЕНИЯ) ====================
+function updateCharCounter() {
+    if (charCounterSpan) charCounterSpan.innerText = `${messageInput.value.length}/500`;
+}
+
+// ==================== РАБОТА С ЧАТОМ ====================
 function renderMessages(messagesArray, currentUserId, partnerNick) {
     if (!messagesContainer) return;
     const wasBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight < 50;
     const children = [...messagesContainer.children];
     children.forEach(c => { if(c.id !== 'emptyState') c.remove(); });
+    const emptyState = document.getElementById('emptyState');
     if (!messagesArray.length) {
-        document.getElementById('emptyState').classList.remove('hidden');
+        if (emptyState) emptyState.classList.remove('hidden');
         return;
     }
-    document.getElementById('emptyState').classList.add('hidden');
+    if (emptyState) emptyState.classList.add('hidden');
     const sorted = [...messagesArray].sort((a,b)=>a.timestamp - b.timestamp);
     let lastDate = null;
     sorted.forEach(msg => {
@@ -150,7 +134,6 @@ async function sendPrivateMessage() {
         await db.ref(`private_messages/${activeChatId}`).push(msg);
         messageInput.value = '';
         updateCharCounter();
-        // обновить последнее сообщение в диалогах
         await db.ref(`user_chats/${currentUser.uid}/${activeChatId}`).update({
             lastMessage: text,
             lastTimestamp: Date.now(),
@@ -166,10 +149,9 @@ async function sendPrivateMessage() {
             partnerUsername: currentUserData.username
         });
         clearTypingIndicator();
-    } catch(e) { console.error(e); }
+    } catch(e) { console.error(e); alert("Ошибка отправки: " + e.message); }
 }
 
-// Индикатор печати (для активного чата)
 function updateTyping(isTyping) {
     if(!activeChatId || !currentUser) return;
     const typingRef = db.ref(`typing/${activeChatId}`);
@@ -258,7 +240,6 @@ async function searchUserByUsername(username) {
 
 async function startDialogWith(uid, userData) {
     const chatId = [currentUser.uid, uid].sort().join('_');
-    // Создаём запись в user_chats для обоих, если нет
     const chatRef = db.ref(`user_chats/${currentUser.uid}/${chatId}`);
     const chatExists = (await chatRef.once('value')).exists();
     if(!chatExists) {
@@ -289,15 +270,20 @@ function openChat(chatId, partner) {
     messagesContainer.innerHTML = '<div class="empty-state" id="emptyState"><div class="empty-emoji">💬</div><p>Напишите первое сообщение</p></div>';
     startListeningMessages(chatId, partner);
     listenTyping(chatId);
-    // мобильная навигация
     if(window.innerWidth <= 550) {
-        document.querySelector('.chats-sidebar').classList.remove('mobile-open');
+        document.querySelector('.chats-sidebar')?.classList.remove('mobile-open');
     }
 }
 
 // ==================== АВТОРИЗАЦИЯ ====================
-function switchToLogin() { loginScreen.classList.remove('hidden'); registerScreen.classList.add('hidden'); }
-function switchToRegister() { loginScreen.classList.add('hidden'); registerScreen.classList.remove('hidden'); }
+function switchToLogin() { 
+    loginScreen.classList.remove('hidden'); 
+    registerScreen.classList.add('hidden'); 
+}
+function switchToRegister() { 
+    loginScreen.classList.add('hidden'); 
+    registerScreen.classList.remove('hidden'); 
+}
 function logout() {
     auth.signOut();
     currentUser = null;
@@ -321,7 +307,6 @@ async function registerUser() {
     try {
         const userCred = await auth.createUserWithEmailAndPassword(email, password);
         const uid = userCred.user.uid;
-        // Проверка уникальности username через usernames узел
         const usernameCheck = await db.ref(`usernames/${uid}`).once('value');
         if(usernameCheck.exists()) throw new Error('Username уже занят');
         await db.ref(`users/${uid}`).set({
@@ -346,43 +331,83 @@ async function loginUser() {
         loginScreen.classList.add('hidden');
         mainAppScreen.classList.remove('hidden');
         loadDialogs();
-        // Если был активный чат - сбросить
         activeChatId = null;
         messagesContainer.innerHTML = '<div class="empty-state" id="emptyState"><div class="empty-emoji">💬</div><p>Выберите диалог</p></div>';
         currentChatTitle.innerText = 'Выберите диалог';
     } catch(e) { alert('Ошибка входа: '+e.message); }
 }
 
-// ==================== ИНИЦИАЛИЗАЦИЯ СОБЫТИЙ ====================
-doLoginBtn.onclick = loginUser;
-doRegisterBtn.onclick = registerUser;
-showRegisterBtn.onclick = switchToRegister;
-showLoginFromRegBtn.onclick = switchToLogin;
-globalLogoutBtn.onclick = logout;
-sendBtn.onclick = sendPrivateMessage;
-searchUserBtn.onclick = () => searchUserByUsername(searchUserInput.value);
-searchUserInput.addEventListener('keypress', (e) => { if(e.key==='Enter') searchUserByUsername(searchUserInput.value); });
-messageInput.addEventListener('input', () => {
+// ==================== ИНИЦИАЛИЗАЦИЯ ПОСЛЕ ЗАГРУЗКИ DOM ====================
+document.addEventListener('DOMContentLoaded', () => {
+    // Получаем все элементы
+    loginScreen = document.getElementById('loginScreen');
+    registerScreen = document.getElementById('registerScreen');
+    mainAppScreen = document.getElementById('mainAppScreen');
+    doLoginBtn = document.getElementById('doLoginBtn');
+    loginEmail = document.getElementById('loginEmail');
+    loginPassword = document.getElementById('loginPassword');
+    showRegisterBtn = document.getElementById('showRegisterBtn');
+    doRegisterBtn = document.getElementById('doRegisterBtn');
+    regEmail = document.getElementById('regEmail');
+    regUsername = document.getElementById('regUsername');
+    regNickname = document.getElementById('regNickname');
+    regPassword = document.getElementById('regPassword');
+    showLoginFromRegBtn = document.getElementById('showLoginFromRegBtn');
+    globalLogoutBtn = document.getElementById('globalLogoutBtn');
+    sidebarUsername = document.getElementById('sidebarUsername');
+    dialogsList = document.getElementById('dialogsList');
+    searchUserInput = document.getElementById('searchUserInput');
+    searchUserBtn = document.getElementById('searchUserBtn');
+    searchResults = document.getElementById('searchResults');
+    messagesContainer = document.getElementById('messagesContainer');
+    messageInput = document.getElementById('messageInput');
+    sendBtn = document.getElementById('sendBtn');
+    charCounterSpan = document.getElementById('charCounter');
+    typingIndicator = document.getElementById('typingIndicatorContainer');
+    typingText = document.getElementById('typingText');
+    currentChatTitle = document.getElementById('currentChatTitle');
+    backToDialogsBtn = document.getElementById('backToDialogsBtn');
+
+    // Проверка существования критических элементов
+    if (!loginScreen || !registerScreen || !mainAppScreen) {
+        console.error("Ошибка: не найдены основные экраны");
+        return;
+    }
+
+    // Назначаем обработчики
+    if (doLoginBtn) doLoginBtn.addEventListener('click', loginUser);
+    if (doRegisterBtn) doRegisterBtn.addEventListener('click', registerUser);
+    if (showRegisterBtn) showRegisterBtn.addEventListener('click', switchToRegister);
+    if (showLoginFromRegBtn) showLoginFromRegBtn.addEventListener('click', switchToLogin);
+    if (globalLogoutBtn) globalLogoutBtn.addEventListener('click', logout);
+    if (sendBtn) sendBtn.addEventListener('click', sendPrivateMessage);
+    if (searchUserBtn) searchUserBtn.addEventListener('click', () => searchUserByUsername(searchUserInput.value));
+    if (searchUserInput) searchUserInput.addEventListener('keypress', (e) => { if(e.key==='Enter') searchUserByUsername(searchUserInput.value); });
+    if (messageInput) {
+        messageInput.addEventListener('input', () => {
+            updateCharCounter();
+            updateTyping(true);
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => updateTyping(false), 1200);
+        });
+        messageInput.addEventListener('keypress', (e) => { if(e.key==='Enter') sendPrivateMessage(); });
+        messageInput.addEventListener('blur', () => updateTyping(false));
+    }
+    if (messagesContainer) {
+        messagesContainer.addEventListener('scroll', () => {
+            const { scrollTop, scrollHeight, clientHeight } = messagesContainer;
+            isAtBottom = scrollHeight - scrollTop - clientHeight < 30;
+        });
+    }
+    if (backToDialogsBtn) {
+        backToDialogsBtn.addEventListener('click', () => {
+            if(window.innerWidth <= 550) document.querySelector('.chats-sidebar')?.classList.add('mobile-open');
+        });
+    }
     updateCharCounter();
-    updateTyping(true);
-    clearTimeout(typingTimeout);
-    typingTimeout = setTimeout(() => updateTyping(false), 1200);
-});
-messageInput.addEventListener('keypress', (e) => { if(e.key==='Enter') sendPrivateMessage(); });
-messageInput.addEventListener('blur', () => updateTyping(false));
-messagesContainer.addEventListener('scroll', () => {
-    const { scrollTop, scrollHeight, clientHeight } = messagesContainer;
-    isAtBottom = scrollHeight - scrollTop - clientHeight < 30;
-});
-backToDialogsBtn.onclick = () => {
-    if(window.innerWidth <= 550) document.querySelector('.chats-sidebar').classList.add('mobile-open');
-    else alert('Кликните на диалог слева');
-};
-function updateCharCounter() {
-    charCounterSpan.innerText = `${messageInput.value.length}/500`;
-}
-updateCharCounter();
-// Авто-выход при изменении аутентификации
-auth.onAuthStateChanged(user => {
-    if(!user && currentUser) logout();
+
+    // Авто-выход при изменении аутентификации
+    auth.onAuthStateChanged(user => {
+        if (!user && currentUser) logout();
+    });
 });
