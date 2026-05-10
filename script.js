@@ -9,7 +9,6 @@ const firebaseConfig = {
     appId: "1:1010287168963:web:15868f94480bb833414176"
 };
 
-// Инициализация Firebase
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.database();
@@ -24,7 +23,7 @@ let typingListener = null;
 let typingTimeout = null;
 let isAtBottom = true;
 
-// DOM элементы (заполнятся после загрузки)
+// DOM элементы
 let loginScreen, registerScreen, mainAppScreen;
 let doLoginBtn, loginEmail, loginPassword, showRegisterBtn;
 let doRegisterBtn, regEmail, regUsername, regNickname, regPassword, showLoginFromRegBtn;
@@ -178,7 +177,14 @@ async function searchUserByUsername(username) {
     const userData = (await db.ref(`users/${foundUid}`).once('value')).val();
     searchResults.innerHTML = `<div class="search-result-item"><span>@${userData.username} — ${userData.nickname}</span><button class="start-chat-btn">Написать</button></div>`;
     searchResults.classList.remove('hidden');
-    document.querySelector('.start-chat-btn').onclick = () => startDialogWith(foundUid, userData);
+    // Используем делегирование или безопасное добавление
+    const btn = searchResults.querySelector('.start-chat-btn');
+    if(btn) {
+        // Убираем предыдущие слушатели, чтобы не дублировать
+        const newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+        newBtn.addEventListener('click', () => startDialogWith(foundUid, userData));
+    }
 }
 
 async function startDialogWith(uid, userData) {
