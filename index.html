@@ -3,69 +3,73 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>DarkChat | Мессенджер</title>
+    <title>DarkChat | Личные сообщения</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 </head>
 <body>
     <div class="app-wrapper">
-        <!-- ЭКРАН ВХОДА (только ник) -->
-        <div id="loginScreen" class="login-screen">
-            <div class="login-card glass-effect">
-                <div class="logo-icon">💬✨</div>
-                <h1>Dark<span style="color:#5865f2;">Chat</span></h1>
-                <p class="subtitle">Введите ваш никнейм</p>
-                <div class="input-group">
-                    <label>👤 Никнейм</label>
-                    <input type="text" id="nicknameInput" placeholder="Анна, Дмитрий..." maxlength="28" autocomplete="off">
+        <!-- ЭКРАН ВХОДА / РЕГИСТРАЦИИ -->
+        <div id="authScreen" class="screen auth">
+            <div class="auth-card">
+                <div class="logo">💬 DarkChat</div>
+                <div class="tabs">
+                    <button id="loginTab" class="tab active">Вход</button>
+                    <button id="registerTab" class="tab">Регистрация</button>
                 </div>
-                <button id="loginBtn" class="btn-primary">🚀 Войти в чат</button>
-                <div class="security-note">
-                    ✨ Сообщения видны всем • Можно удалять свои и копировать любые
+                <div id="loginForm" class="form">
+                    <input type="text" id="loginUsername" placeholder="Никнейм">
+                    <input type="password" id="loginPassword" placeholder="Пароль">
+                    <button id="doLoginBtn" class="btn-primary">Войти</button>
                 </div>
+                <div id="registerForm" class="form hidden">
+                    <input type="text" id="regUsername" placeholder="Никнейм (от 3 до 20 символов)">
+                    <input type="password" id="regPassword" placeholder="Пароль">
+                    <button id="doRegisterBtn" class="btn-primary">Зарегистрироваться</button>
+                </div>
+                <div class="info">🔒 Пароли хранятся в открытом виде (учебный проект)</div>
             </div>
         </div>
 
-        <!-- ИНТЕРФЕЙС ЧАТА -->
-        <div id="chatScreen" class="chat-screen hidden">
-            <div class="chat-header">
-                <div class="header-left">
-                    <div class="online-status-indicator">
-                        <span class="pulse-dot"></span>
-                        <span class="status-text">Live</span>
+        <!-- ОСНОВНОЙ ИНТЕРФЕЙС (ЧАТЫ + СООБЩЕНИЯ) -->
+        <div id="mainScreen" class="screen main hidden">
+            <div class="sidebar">
+                <div class="sidebar-header">
+                    <div class="user-info">
+                        <span class="avatar">👤</span>
+                        <span id="currentUserSidebar"></span>
                     </div>
-                    <h2># общий-чат</h2>
+                    <button id="logoutMainBtn" class="icon-btn" title="Выйти">🚪</button>
                 </div>
-                <div class="user-panel">
-                    <div class="current-user">
-                        <span class="user-avatar">👤</span>
-                        <span class="user-name" id="currentUsernameDisplay"></span>
+                <div class="search-box">
+                    <input type="text" id="searchUsers" placeholder="Поиск пользователей...">
+                </div>
+                <div class="users-list" id="usersList">
+                    <!-- Список всех пользователей (кроме себя) -->
+                </div>
+                <div class="chats-list-header">Личные чаты</div>
+                <div class="chats-list" id="chatsList">
+                    <!-- Список диалогов -->
+                </div>
+            </div>
+            <div class="chat-area">
+                <div class="chat-header" id="chatHeader">
+                    <span>Выберите чат</span>
+                </div>
+                <div class="messages-container" id="messagesContainer">
+                    <div class="empty-chat">👈 Выберите пользователя слева</div>
+                </div>
+                <div class="input-area" id="inputArea" style="display: none;">
+                    <div class="message-input-wrapper">
+                        <input type="text" id="messageInput" placeholder="Введите сообщение... (используйте @ для упоминания)" maxlength="500">
+                        <button id="sendMsgBtn" class="send-button">➤</button>
                     </div>
-                    <button id="logoutBtn" class="icon-btn" title="Сменить ник">🚪</button>
-                </div>
-            </div>
-
-            <div class="messages-container" id="messagesContainer">
-                <div class="empty-state" id="emptyState">
-                    <div class="empty-emoji">💬</div>
-                    <p>Нет сообщений. Напишите первым!</p>
-                </div>
-            </div>
-
-            <div id="typingIndicatorContainer" class="typing-indicator hidden">
-                <div class="typing-dots"><span></span><span></span><span></span></div>
-                <span id="typingText"></span>
-            </div>
-
-            <div class="input-area">
-                <div class="message-input-wrapper">
-                    <input type="text" id="messageInput" placeholder="Введите сообщение..." maxlength="500">
-                    <button id="sendBtn" class="send-button">➤</button>
-                </div>
-                <div class="input-footer">
-                    <span class="helper-text">↵ Enter для отправки</span>
-                    <span id="charCounter">0/500</span>
+                    <div id="mentionSuggestions" class="mention-suggestions hidden"></div>
+                    <div class="input-footer">
+                        <span>↵ Enter</span>
+                        <span id="charCounter">0/500</span>
+                    </div>
                 </div>
             </div>
         </div>
