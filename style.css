@@ -36,7 +36,6 @@ body {
     display: flex;
     flex-direction: column;
 }
-/* ЭКРАН ВХОДА */
 .login-screen {
     flex: 1;
     display: flex;
@@ -56,8 +55,7 @@ body {
 }
 .logo-icon { font-size: 3rem; margin-bottom: 0.5rem; }
 .login-card h1 { font-size: 2rem; margin-bottom: 0.25rem; }
-.input-group { text-align: left; margin-bottom: 1.5rem; }
-.input-group label { display: block; font-size: 0.8rem; margin-bottom: 0.4rem; color: var(--text-secondary); }
+.input-group { margin-bottom: 1.5rem; }
 #nicknameInput {
     width: 100%;
     padding: 12px 14px;
@@ -79,8 +77,6 @@ body {
 }
 .btn-primary:hover { background: var(--accent-hover); transform: scale(1.02);}
 .security-note { font-size: 0.7rem; color: var(--text-muted); margin-top: 1rem; }
-
-/* ЧАТ */
 .chat-screen { display: flex; flex-direction: column; height: 100%; }
 .hidden { display: none !important; }
 .chat-header {
@@ -88,13 +84,10 @@ body {
     padding: 0.8rem 1.5rem;
     display: flex;
     justify-content: space-between;
-    align-items: center;
     border-bottom: 1px solid var(--border-light);
 }
 .user-panel { display: flex; gap: 12px; background: var(--bg-tertiary); padding: 5px 15px; border-radius: 40px; align-items: center; }
-.current-user { display: flex; gap: 8px; align-items: center; }
-.icon-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1.2rem; transition: 0.2s; }
-.icon-btn:hover { color: var(--danger); }
+.icon-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1.2rem; }
 .messages-container {
     flex: 1;
     overflow-y: auto;
@@ -120,11 +113,8 @@ body {
 .own-message .message-bubble { background: var(--accent-color); border-top-right-radius: 4px; border-top-left-radius: 20px; }
 .message-header { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
 .message-author { font-weight: 700; font-size: 0.85rem; color: var(--accent-color); }
-.own-message .message-author { color: #ffffffcc; }
 .message-time { font-size: 0.65rem; color: var(--text-muted); }
-.message-text { font-size: 0.95rem; word-break: break-word; white-space: pre-wrap; }
-
-/* КНОПКИ КОПИРОВАНИЯ / УДАЛЕНИЯ */
+.message-text { font-size: 0.95rem; word-break: break-word; }
 .message-actions {
     display: flex;
     gap: 8px;
@@ -142,14 +132,9 @@ body {
     font-size: 0.7rem;
     cursor: pointer;
     color: var(--text-secondary);
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    transition: 0.1s;
 }
 .action-btn:hover { background: var(--accent-color); color: white; }
 .delete-btn:hover { background: var(--danger); color: white; }
-
 .typing-indicator {
     background: var(--bg-tertiary);
     margin: 6px 18px;
@@ -188,7 +173,6 @@ body {
     border-radius: 50%;
     cursor: pointer;
     color: white;
-    font-size: 1.2rem;
 }
 .input-footer {
     display: flex;
@@ -200,5 +184,4 @@ body {
 .date-divider { text-align: center; margin: 12px 0; font-size: 0.7rem; }
 .date-divider span { background: var(--bg-tertiary); padding: 2px 12px; border-radius: 40px; }
 .empty-state { text-align: center; margin-top: 3rem; opacity: 0.7; }
-.empty-emoji { font-size: 3rem; }
 @media (max-width: 650px) { .message-item { max-width: 92%; } }
