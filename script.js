@@ -308,3 +308,58 @@ document.addEventListener('DOMContentLoaded', () => {
     // Слушаем выход
     auth.onAuthStateChanged(user => { if(!user && currentUser) logout(); });
 });
+// ========== МОБИЛЬНАЯ НАВИГАЦИЯ (TELEGRAM-STYLE) ==========
+const backBtn = document.getElementById('backToDialogsBtn');
+const sidebar2 = document.getElementById('chatsSidebar');
+const overlay = document.getElementById('sidebarOverlay');
+
+function openSidebar() {
+    if (window.innerWidth <= 768) {
+        sidebar2.classList.add('open');
+        overlay.classList.add('active');
+    }
+}
+
+function closeSidebar() {
+    sidebar2.classList.remove('open');
+    overlay.classList.remove('active');
+}
+
+// Кнопка назад показывает список диалогов
+if (backBtn) {
+    backBtn.addEventListener('click', openSidebar);
+}
+
+// Закрытие по оверлею
+if (overlay) {
+    overlay.addEventListener('click', closeSidebar);
+}
+
+// При выборе диалога - закрываем меню и показываем чат
+const originalOpenChatMobile = openChat;
+window.openChat = function(chatId, partner) {
+    originalOpenChatMobile(chatId, partner);
+    closeSidebar();
+};
+openChat = window.openChat;
+
+// Свайп вправо для открытия меню (опционально)
+let touchStartX = 0;
+let touchEndX = 0;
+
+document.addEventListener('touchstart', (e) => {
+    touchStartX = e.changedTouches[0].screenX;
+}, false);
+
+document.addEventListener('touchend', (e) => {
+    touchEndX = e.changedTouches[0].screenX;
+    const swipeDistance = touchEndX - touchStartX;
+    // Свайп вправо больше 50px
+    if (swipeDistance > 50 && window.innerWidth <= 768 && !sidebar2.classList.contains('open')) {
+        openSidebar();
+    }
+    // Свайп влево для закрытия
+    if (swipeDistance < -50 && window.innerWidth <= 768 && sidebar2.classList.contains('open')) {
+        closeSidebar();
+    }
+}, false);
