@@ -9,7 +9,6 @@
     --text-muted: #7d828c;
     --border: #2c2f36;
     --danger: #ed4245;
-    --success: #23a55a;
 }
 body {
     font-family: 'Inter', system-ui, sans-serif;
@@ -20,6 +19,7 @@ body {
     justify-content: center;
     color: var(--text);
 }
+@import url('https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap');
 .app-wrapper {
     width: 100%;
     max-width: 1400px;
@@ -32,7 +32,7 @@ body {
 .screen { height: 100%; width: 100%; }
 .hidden { display: none !important; }
 
-/* АВТОРИЗАЦИЯ */
+/* ----- АВТОРИЗАЦИЯ ----- */
 .auth {
     display: flex;
     align-items: center;
@@ -75,14 +75,13 @@ body {
     font-weight: bold;
     cursor: pointer;
     color: white;
+    transition: 0.2s;
 }
+.btn-primary:hover { background: var(--accent-hover); }
 .info { font-size: 0.7rem; color: var(--text-muted); margin-top: 1rem; }
 
-/* ОСНОВНОЙ ЭКРАН (две колонки) */
-.main {
-    display: flex;
-    height: 100%;
-}
+/* ----- ОСНОВНОЙ ИНТЕРФЕЙС (две колонки) ----- */
+.main { display: flex; height: 100%; }
 .sidebar {
     width: 300px;
     background: var(--bg-secondary);
@@ -107,7 +106,7 @@ body {
     font-size: 1.2rem;
 }
 .search-box { padding: 0.8rem; }
-#searchUsers {
+#searchUserInput {
     width: 100%;
     background: var(--bg-tertiary);
     border: none;
@@ -115,15 +114,15 @@ body {
     border-radius: 20px;
     color: white;
 }
+.section-title {
+    padding: 0.5rem 1rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    border-top: 1px solid var(--border);
+}
 .users-list, .chats-list {
     flex: 1;
     overflow-y: auto;
-}
-.chats-list-header {
-    padding: 0.5rem 1rem;
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    border-top: 1px solid var(--border);
 }
 .user-item, .chat-item {
     display: flex;
@@ -183,7 +182,7 @@ body {
 .message-header {
     display: flex;
     gap: 8px;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     margin-bottom: 4px;
 }
 .message-author { font-weight: bold; color: var(--accent); }
@@ -216,7 +215,7 @@ body {
     max-height: 150px;
     overflow-y: auto;
     position: absolute;
-    bottom: 60px;
+    bottom: 65px;
     width: calc(100% - 40px);
     z-index: 10;
 }
