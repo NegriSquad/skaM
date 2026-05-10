@@ -735,4 +735,34 @@ body {
 
 .sidebar-overlay.active {
     display: block;
+// Мобильное меню
+const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+const sidebar = document.getElementById('chatsSidebar');
+const sidebarOverlay = document.getElementById('sidebarOverlay');
+
+function closeMobileSidebar() {
+    if(sidebar) sidebar.classList.remove('mobile-open');
+    if(sidebarOverlay) sidebarOverlay.classList.remove('active');
+}
+
+function openMobileSidebar() {
+    if(sidebar) sidebar.classList.add('mobile-open');
+    if(sidebarOverlay) sidebarOverlay.classList.add('active');
+}
+
+if(mobileMenuBtn) {
+    mobileMenuBtn.addEventListener('click', openMobileSidebar);
+}
+
+if(sidebarOverlay) {
+    sidebarOverlay.addEventListener('click', closeMobileSidebar);
+}
+
+// Закрывать меню при выборе диалога
+const originalOpenChat = openChat;
+window.openChat = function(chatId, partner) {
+    originalOpenChat(chatId, partner);
+    closeMobileSidebar();
+};
+openChat = window.openChat;
 }
