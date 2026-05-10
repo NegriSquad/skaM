@@ -10,65 +10,66 @@
 </head>
 <body>
     <div class="app-wrapper">
-        <!-- ЭКРАН ВХОДА / РЕГИСТРАЦИИ -->
+        <!-- ЭКРАН АВТОРИЗАЦИИ -->
         <div id="authScreen" class="screen auth">
             <div class="auth-card">
                 <div class="logo">💬 DarkChat</div>
                 <div class="tabs">
-                    <button id="loginTab" class="tab active">Вход</button>
-                    <button id="registerTab" class="tab">Регистрация</button>
+                    <button id="tabLogin" class="tab active">Вход</button>
+                    <button id="tabRegister" class="tab">Регистрация</button>
                 </div>
+                <!-- Форма входа -->
                 <div id="loginForm" class="form">
-                    <input type="text" id="loginUsername" placeholder="Никнейм">
+                    <input type="text" id="loginUsername" placeholder="Никнейм" autocomplete="off">
                     <input type="password" id="loginPassword" placeholder="Пароль">
-                    <button id="doLoginBtn" class="btn-primary">Войти</button>
+                    <button id="btnLogin" class="btn-primary">Войти</button>
                 </div>
+                <!-- Форма регистрации -->
                 <div id="registerForm" class="form hidden">
-                    <input type="text" id="regUsername" placeholder="Никнейм (от 3 до 20 символов)">
+                    <input type="text" id="regUsername" placeholder="Никнейм (от 3 символов)">
                     <input type="password" id="regPassword" placeholder="Пароль">
-                    <button id="doRegisterBtn" class="btn-primary">Зарегистрироваться</button>
+                    <button id="btnRegister" class="btn-primary">Зарегистрироваться</button>
                 </div>
-                <div class="info">🔒 Пароли хранятся в открытом виде (учебный проект)</div>
+                <div class="info">🔐 Пароли хранятся в открытом виде (учебный проект)</div>
             </div>
         </div>
 
-        <!-- ОСНОВНОЙ ИНТЕРФЕЙС (ЧАТЫ + СООБЩЕНИЯ) -->
+        <!-- ОСНОВНОЙ ЭКРАН (ДВЕ КОЛОНКИ) -->
         <div id="mainScreen" class="screen main hidden">
+            <!-- Левая панель: пользователи и чаты -->
             <div class="sidebar">
                 <div class="sidebar-header">
                     <div class="user-info">
-                        <span class="avatar">👤</span>
-                        <span id="currentUserSidebar"></span>
+                        <span>👤</span>
+                        <span id="currentUserLabel"></span>
                     </div>
-                    <button id="logoutMainBtn" class="icon-btn" title="Выйти">🚪</button>
+                    <button id="logoutBtnMain" class="icon-btn" title="Выйти">🚪</button>
                 </div>
                 <div class="search-box">
-                    <input type="text" id="searchUsers" placeholder="Поиск пользователей...">
+                    <input type="text" id="searchUserInput" placeholder="Поиск пользователей...">
                 </div>
-                <div class="users-list" id="usersList">
-                    <!-- Список всех пользователей (кроме себя) -->
-                </div>
-                <div class="chats-list-header">Личные чаты</div>
-                <div class="chats-list" id="chatsList">
-                    <!-- Список диалогов -->
-                </div>
+                <div class="section-title">Все пользователи</div>
+                <div class="users-list" id="usersList"></div>
+                <div class="section-title">Мои диалоги</div>
+                <div class="chats-list" id="chatsList"></div>
             </div>
+            <!-- Правая панель: выбранный чат -->
             <div class="chat-area">
-                <div class="chat-header" id="chatHeader">
-                    <span>Выберите чат</span>
+                <div class="chat-header" id="chatAreaHeader">
+                    <span id="chatWithName">Выберите чат</span>
                 </div>
                 <div class="messages-container" id="messagesContainer">
-                    <div class="empty-chat">👈 Выберите пользователя слева</div>
+                    <div class="empty-chat">👈 Нажмите на пользователя слева</div>
                 </div>
-                <div class="input-area" id="inputArea" style="display: none;">
+                <div class="input-area" id="inputPanel" style="display: none;">
                     <div class="message-input-wrapper">
-                        <input type="text" id="messageInput" placeholder="Введите сообщение... (используйте @ для упоминания)" maxlength="500">
-                        <button id="sendMsgBtn" class="send-button">➤</button>
+                        <input type="text" id="messageInput" placeholder="Сообщение... (@ для упоминания)">
+                        <button id="sendMessageBtn" class="send-button">➤</button>
                     </div>
                     <div id="mentionSuggestions" class="mention-suggestions hidden"></div>
                     <div class="input-footer">
                         <span>↵ Enter</span>
-                        <span id="charCounter">0/500</span>
+                        <span id="charCount">0/500</span>
                     </div>
                 </div>
             </div>
