@@ -1,4 +1,4 @@
-// ========== КОНФИГ FIREBASE (ТВОЙ) ==========
+// ========== ТВОЙ КОНФИГ FIREBASE ==========
 const firebaseConfig = {
     apiKey: "AIzaSyD3NEXunS2PQPVQ3nDS27Nk4JIG3xajyVM",
     authDomain: "messendger-71e53.firebaseapp.com",
@@ -11,84 +11,70 @@ const firebaseConfig = {
 
 let db, usersRef, chatsRef, messagesRef;
 let currentUser = null;          // { username }
-let currentChatWith = null;      // username собеседника
-let messagesListener = null;
-let allUsers = [];               // список всех пользователей
+let currentChatWith = null;      // с кем сейчас открыт чат
+let messagesUnsubscribe = null;
+let allUsers = [];               // массив всех ников
 
-// DOM
-const authScreen = document.getElementById('authScreen');
-const mainScreen = document.getElementById('mainScreen');
-const loginTab = document.getElementById('loginTab');
-const registerTab = document.getElementById('registerTab');
-const loginForm = document.getElementById('loginForm');
-const registerForm = document.getElementById('registerForm');
-const doLoginBtn = document.getElementById('doLoginBtn');
-const doRegisterBtn = document.getElementById('doRegisterBtn');
-const loginUsername = document.getElementById('loginUsername');
-const loginPassword = document.getElementById('loginPassword');
-const regUsername = document.getElementById('regUsername');
-const regPassword = document.getElementById('regPassword');
-const currentUserSidebar = document.getElementById('currentUserSidebar');
-const logoutMainBtn = document.getElementById('logoutMainBtn');
-const usersListDiv = document.getElementById('usersList');
-const chatsListDiv = document.getElementById('chatsList');
-const searchUsersInput = document.getElementById('searchUsers');
-const messagesContainer = document.getElementById('messagesContainer');
-const messageInput = document.getElementById('messageInput');
-const sendMsgBtn = document.getElementById('sendMsgBtn');
-const chatHeaderSpan = document.querySelector('#chatHeader span');
-const inputArea = document.getElementById('inputArea');
-const charCounter = document.getElementById('charCounter');
-const mentionSuggestions = document.getElementById('mentionSuggestions');
+// DOM элементы – получаем только после загрузки страницы
+let authScreen, mainScreen, loginForm, registerForm;
+let tabLogin, tabRegister, btnLogin, btnRegister;
+let loginUsername, loginPassword, regUsername, regPassword;
+let currentUserLabel, logoutBtn, searchUserInput, usersListDiv, chatsListDiv;
+let chatAreaHeaderSpan, messagesContainer, inputPanel, messageInput, sendMsgBtn, charCountSpan;
 
 // Инициализация Firebase
 try {
     firebase.initializeApp(firebaseConfig);
     db = firebase.database();
     usersRef = db.ref('users');
-    chatsRef = db.ref('chats');      // список диалогов для каждого пользователя
+    chatsRef = db.ref('chats');
     messagesRef = db.ref('messages');
-    console.log("✅ Firebase подключена");
-} catch(e) { alert("Ошибка Firebase: " + e.message); }
+    console.log("✅ Firebase готова");
+} catch(e) {
+    alert("Ошибка Firebase: " + e.message);
+}
 
 // ---------- ВСПОМОГАТЕЛЬНЫЕ ----------
 function escapeHtml(str) {
-    if(!str) return '';
+    if (!str) return '';
     return str.replace(/[&<>]/g, m => m=='&'?'&amp;': m=='<'?'&lt;':'&gt;');
 }
-function formatTime(ts) { return new Date(ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }
-
-// Получение ID чата между двумя пользователями (лексикографически)
+function formatTime(ts) {
+    return new Date(ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+}
 function getChatId(userA, userB) {
-    const sorted = [userA, userB].sort();
-    return `${sorted[0]}_${sorted[1]}`;
+    return [userA, userB].sort().join('_');
 }
 
 // ---------- АВТОРИЗАЦИЯ ----------
 async function register() {
     const username = regUsername.value.trim();
     const password = regPassword.value.trim();
-    if(username.length < 3 || password.length < 3) {
-        alert("Ник и пароль не менее 3 символов");
+    if (username.length < 3 || password.length < 3) {
+        alert("Ник и пароль должны быть не менее 3 символов");
         return;
     }
-    const snapshot = await usersRef.child(username).once('value');
-    if(snapshot.exists()) {
+    const snap = await usersRef.child(username).once('value');
+    if (snap.exists()) {
         alert("Пользователь уже существует");
         return;
     }
     await usersRef.child(username).set({ password, createdAt: Date.now() });
     alert("Регистрация успешна! Теперь войдите.");
-    loginTab.click();
+    // Переключиться на вкладку входа
+    tabLogin.click();
 }
 
 async function login() {
     const username = loginUsername.value.trim();
     const password = loginPassword.value.trim();
-    if(!username || !password) { alert("Введите ник и пароль"); return; }
-    const snapshot = await usersRef.child(username).once('value');
-    const user = snapshot.val();
-    if(!user || user.password !== password) {
+    if (!username || !password) {
+        alert("Введите ник и пароль");
+        return;
+    }
+    const snap = await usersRef.child(username).once('value');
+    const user = snap.val();
+    if (!user || user.password !== password) {
         alert("Неверный ник или пароль");
         return;
     }
@@ -99,7 +85,7 @@ async function login() {
 }
 
 function logout() {
-    if(messagesListener) messagesListener.off();
+    if (messagesUnsubscribe) messagesUnsubscribe();
     currentUser = null;
     currentChatWith = null;
     localStorage.removeItem("darkchat_user");
@@ -111,56 +97,57 @@ function logout() {
 async function showMainScreen() {
     authScreen.classList.add('hidden');
     mainScreen.classList.remove('hidden');
-    currentUserSidebar.innerText = currentUser.username;
+    currentUserLabel.innerText = currentUser.username;
     await loadUsersList();
     await loadChatsList();
-    // Сбрасываем активный чат
-    currentChatWith = null;
-    chatHeaderSpan.innerText = "Выберите чат";
-    messagesContainer.innerHTML = '<div class="empty-chat">👈 Выберите пользователя слева</div>';
-    inputArea.style.display = 'none';
-    if(messagesListener) messagesListener.off();
+    // Сбрасываем открытый чат
+    if (currentChatWith) {
+        currentChatWith = null;
+        chatAreaHeaderSpan.innerText = "Выберите чат";
+        messagesContainer.innerHTML = '<div class="empty-chat">👈 Нажмите на пользователя слева</div>';
+        inputPanel.style.display = 'none';
+        if (messagesUnsubscribe) messagesUnsubscribe();
+    }
 }
 
-// Загрузка всех пользователей (кроме себя)
+// Загрузить всех пользователей (кроме себя) и отобразить в левой колонке
 async function loadUsersList() {
-    const snapshot = await usersRef.once('value');
-    const users = snapshot.val();
+    const snap = await usersRef.once('value');
+    const users = snap.val();
     allUsers = [];
     usersListDiv.innerHTML = '';
-    for(let username in users) {
-        if(username !== currentUser.username) {
-            allUsers.push(username);
+    for (let name in users) {
+        if (name !== currentUser.username) {
+            allUsers.push(name);
             const div = document.createElement('div');
             div.className = 'user-item';
-            div.innerHTML = `<span class="user-avatar">👤</span><span class="user-name">${escapeHtml(username)}</span>`;
-            div.onclick = () => openChatWith(username);
+            div.innerHTML = `<span class="user-avatar">👤</span><span class="user-name">${escapeHtml(name)}</span>`;
+            div.onclick = () => openChatWith(name);
             usersListDiv.appendChild(div);
         }
     }
-    // Фильтрация по поиску
-    searchUsersInput.oninput = () => {
-        const query = searchUsersInput.value.toLowerCase();
-        const items = usersListDiv.querySelectorAll('.user-item');
-        items.forEach(item => {
+    // Поиск
+    searchUserInput.oninput = () => {
+        const query = searchUserInput.value.toLowerCase();
+        Array.from(usersListDiv.children).forEach(item => {
             const name = item.querySelector('.user-name').innerText.toLowerCase();
             item.style.display = name.includes(query) ? 'flex' : 'none';
         });
     };
 }
 
-// Загрузка списка диалогов (чатов) для текущего пользователя
+// Загрузить список диалогов текущего пользователя
 async function loadChatsList() {
-    const snapshot = await chatsRef.child(currentUser.username).once('value');
-    const chats = snapshot.val();
+    const snap = await chatsRef.child(currentUser.username).once('value');
+    const chats = snap.val();
     chatsListDiv.innerHTML = '';
-    if(!chats) return;
-    for(let otherUser in chats) {
+    if (!chats) return;
+    for (let otherUser in chats) {
         const lastMsg = chats[otherUser].lastMessage || '';
         const div = document.createElement('div');
         div.className = 'chat-item';
         div.innerHTML = `
-            <span class="user-avatar">💬</span>
+            <span>💬</span>
             <div><div class="user-name">${escapeHtml(otherUser)}</div><div style="font-size:0.7rem;color:#7d828c">${escapeHtml(lastMsg.substring(0,30))}</div></div>
         `;
         div.onclick = () => openChatWith(otherUser);
@@ -168,63 +155,60 @@ async function loadChatsList() {
     }
 }
 
-// Открыть чат с пользователем
+// Открыть чат с конкретным пользователем
 function openChatWith(username) {
-    if(username === currentUser.username) return;
+    if (username === currentUser.username) return;
     currentChatWith = username;
-    chatHeaderSpan.innerText = username;
-    inputArea.style.display = 'block';
-    // Подгружаем сообщения
+    chatAreaHeaderSpan.innerText = username;
+    inputPanel.style.display = 'block';
+    // Подписаться на сообщения этого чата
     loadMessagesForChat(currentUser.username, username);
-    // Добавляем в список чатов (если нет, создаём запись в chats)
-    updateChatsList(currentUser.username, username);
+    // Обновить/создать запись о диалоге в базе
+    updateChatsEntry(currentUser.username, username);
+    messageInput.value = '';
+    updateCharCount();
     messageInput.focus();
 }
 
-// Обновить/создать запись о диалоге в базе
-async function updateChatsList(myName, otherName) {
+async function updateChatsEntry(myName, otherName) {
     const chatId = getChatId(myName, otherName);
-    // Для меня
     await chatsRef.child(myName).child(otherName).set({ lastMessage: '', timestamp: Date.now() });
-    // Для собеседника
     await chatsRef.child(otherName).child(myName).set({ lastMessage: '', timestamp: Date.now() });
-    loadChatsList(); // перезагрузить список
+    loadChatsList();
 }
 
-// Загрузка сообщений из конкретного чата
+// Подписка на сообщения в реальном времени
 function loadMessagesForChat(userA, userB) {
-    if(messagesListener) messagesListener.off();
+    if (messagesUnsubscribe) messagesUnsubscribe();
     const chatId = getChatId(userA, userB);
-    const chatMessagesRef = messagesRef.child(chatId);
-    messagesListener = chatMessagesRef.orderByChild('timestamp').limitToLast(50).on('value', (snapshot) => {
+    const chatMsgsRef = messagesRef.child(chatId);
+    const callback = (snapshot) => {
         const data = snapshot.val();
-        const messagesList = [];
-        if(data) {
-            Object.keys(data).forEach(key => messagesList.push({ id: key, ...data[key] }));
+        const msgs = [];
+        if (data) {
+            Object.keys(data).forEach(key => msgs.push({ id: key, ...data[key] }));
         }
-        renderChatMessages(messagesList);
-    });
+        renderMessages(msgs);
+    };
+    chatMsgsRef.on('value', callback);
+    messagesUnsubscribe = () => chatMsgsRef.off('value', callback);
 }
 
-// Отрисовка сообщений в выбранном чате
-function renderChatMessages(messagesArray) {
-    if(!messagesContainer) return;
+// Отрисовка сообщений
+function renderMessages(msgsArray) {
     const wasBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight < 50;
     messagesContainer.innerHTML = '';
-    if(!messagesArray.length) {
+    if (!msgsArray.length) {
         messagesContainer.innerHTML = '<div class="empty-chat">Нет сообщений. Напишите первым!</div>';
         return;
     }
-    const sorted = [...messagesArray].sort((a,b) => a.timestamp - b.timestamp);
+    const sorted = [...msgsArray].sort((a,b) => a.timestamp - b.timestamp);
     sorted.forEach(msg => {
         const isOwn = (msg.sender === currentUser.username);
         const msgDiv = document.createElement('div');
         msgDiv.className = `message-item ${isOwn ? 'own' : ''}`;
-        // Обработка упоминаний в тексте: подсветка @username
         let textHtml = escapeHtml(msg.text);
-        textHtml = textHtml.replace(/@(\w+)/g, (match, name) => {
-            return `<span class="mention">@${escapeHtml(name)}</span>`;
-        });
+        textHtml = textHtml.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
         msgDiv.innerHTML = `
             <div class="message-bubble">
                 <div class="message-header">
@@ -234,120 +218,102 @@ function renderChatMessages(messagesArray) {
                 <div class="message-text">${textHtml}</div>
             </div>
             <div class="message-actions">
-                <button class="action-btn copy-btn" data-text="${escapeHtml(msg.text).replace(/"/g, '&quot;')}">📋 Копировать</button>
-                ${isOwn ? `<button class="action-btn delete-btn" data-id="${msg.id}">🗑️ Удалить</button>` : ''}
+                <button class="action-btn copy-btn" data-msgtext="${escapeHtml(msg.text).replace(/"/g, '&quot;')}">📋 Копировать</button>
+                ${isOwn ? `<button class="action-btn delete-btn" data-msgid="${msg.id}">🗑️ Удалить</button>` : ''}
             </div>
         `;
         messagesContainer.appendChild(msgDiv);
     });
-    // Обработчики кнопок
+    // Обработчики для кнопок
     document.querySelectorAll('.copy-btn').forEach(btn => {
         btn.onclick = (e) => {
             e.stopPropagation();
-            const txt = btn.getAttribute('data-text').replace(/&quot;/g, '"');
+            const txt = btn.getAttribute('data-msgtext').replace(/&quot;/g, '"');
             navigator.clipboard.writeText(txt);
-            btn.innerHTML = '✅';
-            setTimeout(() => btn.innerHTML = '📋 Копировать', 1000);
+            btn.innerText = '✅';
+            setTimeout(() => btn.innerText = '📋 Копировать', 1000);
         };
     });
     document.querySelectorAll('.delete-btn').forEach(btn => {
         btn.onclick = async (e) => {
             e.stopPropagation();
-            const msgId = btn.getAttribute('data-id');
-            if(confirm('Удалить сообщение?')) {
+            const msgId = btn.getAttribute('data-msgid');
+            if (confirm('Удалить сообщение?')) {
                 const chatId = getChatId(currentUser.username, currentChatWith);
                 await messagesRef.child(chatId).child(msgId).remove();
             }
         };
     });
-    if(wasBottom) messagesContainer.scrollTo({ top: messagesContainer.scrollHeight, behavior: 'smooth' });
+    if (wasBottom) messagesContainer.scrollTo({ top: messagesContainer.scrollHeight, behavior: 'smooth' });
 }
 
 // Отправка сообщения
 async function sendMessage() {
-    if(!currentUser || !currentChatWith) return;
+    if (!currentUser || !currentChatWith) return;
     const text = messageInput.value.trim();
-    if(text === "") return;
+    if (!text) return;
     const chatId = getChatId(currentUser.username, currentChatWith);
     const newMsg = {
         sender: currentUser.username,
         text: text,
         timestamp: Date.now()
     };
-    const newMsgRef = await messagesRef.child(chatId).push(newMsg);
-    // Обновляем последнее сообщение в списке чатов
+    await messagesRef.child(chatId).push(newMsg);
+    // Обновить последнее сообщение в диалогах
     await chatsRef.child(currentUser.username).child(currentChatWith).set({ lastMessage: text, timestamp: Date.now() });
     await chatsRef.child(currentChatWith).child(currentUser.username).set({ lastMessage: text, timestamp: Date.now() });
     messageInput.value = "";
-    updateCharCounter();
-    // Автоскролл будет после рендера
-    loadChatsList();
+    updateCharCount();
+    loadChatsList();  // обновить список диалогов
 }
 
-// Упоминания: при вводе @ показывать список пользователей
+// Упоминания (@)
 let mentionActive = false;
-let mentionStartPos = -1;
-
-messageInput.addEventListener('input', (e) => {
-    updateCharCounter();
+function onMessageInput() {
+    updateCharCount();
     const val = messageInput.value;
     const cursorPos = messageInput.selectionStart;
-    // Ищем последний @ перед курсором
-    const lastAtIndex = val.lastIndexOf('@', cursorPos-1);
-    if(lastAtIndex !== -1 && (lastAtIndex === 0 || val[lastAtIndex-1] === ' ')) {
-        const query = val.substring(lastAtIndex+1, cursorPos);
-        if(query.length <= 20) {
-            const filtered = allUsers.filter(u => u.toLowerCase().startsWith(query.toLowerCase()));
-            showMentionSuggestions(filtered, lastAtIndex);
-            mentionActive = true;
-            mentionStartPos = lastAtIndex;
-            return;
-        }
+    const lastAt = val.lastIndexOf('@', cursorPos-1);
+    if (lastAt !== -1 && (lastAt === 0 || val[lastAt-1] === ' ')) {
+        const query = val.substring(lastAt+1, cursorPos);
+        const filtered = allUsers.filter(u => u.toLowerCase().startsWith(query.toLowerCase()));
+        showMentionSuggestions(filtered, lastAt);
+    } else {
+        hideMentionSuggestions();
     }
-    hideMentionSuggestions();
-    mentionActive = false;
-});
-
-function showMentionSuggestions(users, startPos) {
-    if(users.length === 0) { hideMentionSuggestions(); return; }
+}
+function showMentionSuggestions(users, atPos) {
+    if (!users.length) { hideMentionSuggestions(); return; }
     mentionSuggestions.innerHTML = '';
     users.forEach(user => {
-        const div = document.createElement('div');
-        div.className = 'mention-suggestion-item';
-        div.innerText = user;
-        div.onclick = () => {
-            const before = messageInput.value.substring(0, startPos);
+        const item = document.createElement('div');
+        item.className = 'mention-suggestion-item';
+        item.innerText = user;
+        item.onclick = () => {
+            const before = messageInput.value.substring(0, atPos);
             const after = messageInput.value.substring(messageInput.selectionStart);
             messageInput.value = before + user + ' ' + after;
             hideMentionSuggestions();
             messageInput.focus();
         };
-        mentionSuggestions.appendChild(div);
+        mentionSuggestions.appendChild(item);
     });
     mentionSuggestions.classList.remove('hidden');
 }
-function hideMentionSuggestions() { mentionSuggestions.classList.add('hidden'); }
-
-function updateCharCounter() {
-    charCounter.innerText = `${messageInput.value.length}/500`;
+function hideMentionSuggestions() {
+    mentionSuggestions.classList.add('hidden');
 }
-
-// Отправка по Enter
-messageInput.addEventListener('keypress', (e) => {
-    if(e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-    }
-});
-sendMsgBtn.addEventListener('click', sendMessage);
+function updateCharCount() {
+    charCountSpan.innerText = `${messageInput.value.length}/500`;
+}
 
 // Восстановление сессии
 async function tryAutoLogin() {
     const savedUser = localStorage.getItem("darkchat_user");
     const savedPass = localStorage.getItem("darkchat_pass");
-    if(savedUser && savedPass) {
+    if (savedUser && savedPass) {
         const snap = await usersRef.child(savedUser).once('value');
-        if(snap.val() && snap.val().password === savedPass) {
+        if (snap.val() && snap.val().password === savedPass) {
             currentUser = { username: savedUser };
             showMainScreen();
             return true;
@@ -356,26 +322,61 @@ async function tryAutoLogin() {
     return false;
 }
 
-// Переключение вкладок
-loginTab.onclick = () => {
-    loginTab.classList.add('active');
-    registerTab.classList.remove('active');
-    loginForm.classList.remove('hidden');
-    registerForm.classList.add('hidden');
-};
-registerTab.onclick = () => {
-    registerTab.classList.add('active');
-    loginTab.classList.remove('active');
-    registerForm.classList.remove('hidden');
-    loginForm.classList.add('hidden');
-};
-doLoginBtn.onclick = login;
-doRegisterBtn.onclick = register;
-logoutMainBtn.onclick = logout;
-
-// Запуск
+// -------- ЖДЁМ ПОЛНОЙ ЗАГРУЗКИ СТРАНИЦЫ, чтобы найти элементы ----------
 window.addEventListener('DOMContentLoaded', async () => {
-    if(!(await tryAutoLogin())) {
+    // Получаем все DOM элементы
+    authScreen = document.getElementById('authScreen');
+    mainScreen = document.getElementById('mainScreen');
+    tabLogin = document.getElementById('tabLogin');
+    tabRegister = document.getElementById('tabRegister');
+    loginForm = document.getElementById('loginForm');
+    registerForm = document.getElementById('registerForm');
+    btnLogin = document.getElementById('btnLogin');
+    btnRegister = document.getElementById('btnRegister');
+    loginUsername = document.getElementById('loginUsername');
+    loginPassword = document.getElementById('loginPassword');
+    regUsername = document.getElementById('regUsername');
+    regPassword = document.getElementById('regPassword');
+    currentUserLabel = document.getElementById('currentUserLabel');
+    logoutBtn = document.getElementById('logoutBtnMain');
+    searchUserInput = document.getElementById('searchUserInput');
+    usersListDiv = document.getElementById('usersList');
+    chatsListDiv = document.getElementById('chatsList');
+    chatAreaHeaderSpan = document.querySelector('#chatAreaHeader span');
+    messagesContainer = document.getElementById('messagesContainer');
+    inputPanel = document.getElementById('inputPanel');
+    messageInput = document.getElementById('messageInput');
+    sendMsgBtn = document.getElementById('sendMessageBtn');
+    charCountSpan = document.getElementById('charCount');
+    mentionSuggestions = document.getElementById('mentionSuggestions');
+
+    // Переключение вкладок
+    tabLogin.onclick = () => {
+        tabLogin.classList.add('active');
+        tabRegister.classList.remove('active');
+        loginForm.classList.remove('hidden');
+        registerForm.classList.add('hidden');
+    };
+    tabRegister.onclick = () => {
+        tabRegister.classList.add('active');
+        tabLogin.classList.remove('active');
+        registerForm.classList.remove('hidden');
+        loginForm.classList.add('hidden');
+    };
+    btnLogin.onclick = login;
+    btnRegister.onclick = register;
+    logoutBtn.onclick = logout;
+    sendMsgBtn.onclick = sendMessage;
+    messageInput.addEventListener('input', onMessageInput);
+    messageInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+
+    // Попытка автовхода
+    if (!(await tryAutoLogin())) {
         authScreen.classList.remove('hidden');
         mainScreen.classList.add('hidden');
     }
