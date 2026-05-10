@@ -1,15 +1,16 @@
 // ============================================================
-// DARKCHAT - только ник, удаление и копирование сообщений
+// DARKCHAT - исправленная версия с обработкой ошибок Firebase
 // ============================================================
 
 /* ----------------- ИНСТРУКЦИЯ FIREBASE -----------------
    1. Создайте проект в Firebase Console.
    2. В Realtime Database установите правила: { "rules": { ".read": true, ".write": true } }
    3. Скопируйте свой конфиг (apiKey, databaseURL) и вставьте ниже.
+   4. Если конфиг не заполнен, чат работает в ДЕМО-режиме (сообщения не сохраняются между сессиями).
 */
 
 const firebaseConfig = {
-    apiKey: "AIzaSyD3NEXunS2PQPVQ3nDS27Nk4JIG3xajyVM",
+ apiKey: "AIzaSyD3NEXunS2PQPVQ3nDS27Nk4JIG3xajyVM",
   authDomain: "messendger-71e53.firebaseapp.com",
   databaseURL: "https://messendger-71e53-default-rtdb.firebaseio.com",
   projectId: "messendger-71e53",
@@ -19,10 +20,17 @@ const firebaseConfig = {
   measurementId: "G-6RYMEGSKNM"
 };
 
+// Глобальные переменные
 let db, messagesRef, typingRef;
-let currentUser = null;          // { nickname }
+let currentUser = null;
 let messagesListener = null;
 let typingTimeout = null;
+let firebaseReady = false;
+let demoMode = false;   // если true — используем локальный массив вместо Firebase
+
+// Локальное хранилище для демо-режима
+let localMessages = [];
+let localTypingUsers = {};
 
 // DOM элементы
 const loginScreen = document.getElementById('loginScreen');
@@ -38,22 +46,35 @@ const typingDiv = document.getElementById('typingIndicatorContainer');
 const typingTextSpan = document.getElementById('typingText');
 const charCounter = document.getElementById('charCounter');
 
-// Инициализация Firebase
-let firebaseReady = false;
+// ---------- Инициализация Firebase или переход в демо-режим ----------
 try {
-    if (firebaseConfig.apiKey !== "ВАШ_API_KEY") {
+    // Проверяем, заполнен ли конфиг (не содержит "ВАШ_")
+    const isConfigFilled = firebaseConfig.apiKey !== "ВАШ_API_KEY" && 
+                           firebaseConfig.databaseURL !== "https://ВАШ_ПРОЕКТ.firebaseio.com";
+    if (isConfigFilled) {
         firebase.initializeApp(firebaseConfig);
         db = firebase.database();
         messagesRef = db.ref('messages');
         typingRef = db.ref('typing');
         firebaseReady = true;
-        console.log("✅ Firebase готова");
+        demoMode = false;
+        console.log("✅ Firebase подключена! Чат работает в реальном времени.");
     } else {
-        alert("⚠️ Настройте Firebase в script.js (укажите apiKey и databaseURL)");
+        console.warn("⚠️ Firebase не настроен. Включён ДЕМО-РЕЖИМ (сообщения не сохраняются после перезагрузки).");
+        demoMode = true;
+        firebaseReady = false;
+        // Загружаем демо-сообщения из localStorage, если есть
+        const saved = localStorage.getItem("darkchat_demo_messages");
+        if (saved) localMessages = JSON.parse(saved);
     }
-} catch(e) { console.error(e); }
+} catch(e) {
+    console.error("Ошибка Firebase:", e);
+    demoMode = true;
+    firebaseReady = false;
+    alert("Ошибка подключения к Firebase. Включён демо-режим.");
+}
 
-// Вспомогательные функции
+// ---------- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ----------
 function escapeHtml(str) {
     if (!str) return '';
     return str.replace(/[&<>]/g, function(m) {
@@ -72,47 +93,24 @@ function formatDateGroup(ts) {
     const d = new Date(ts);
     const today = new Date();
     if (d.toDateString() === today.toDateString()) return "Сегодня";
-    const yesterday = new Date(today); yesterday.setDate(today.getDate()-1);
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate()-1);
     if (d.toDateString() === yesterday.toDateString()) return "Вчера";
     return d.toLocaleDateString('ru-RU');
 }
 
-// Вход по нику
-function enterChat() {
-    if (!firebaseReady) return alert("Firebase не инициализирована");
-    const nick = nicknameInput.value.trim();
-    if (nick.length < 2) return alert("Никнейм должен быть не менее 2 символов");
-    currentUser = { nickname: nick };
-    localStorage.setItem("darkchat_user", nick);
-    showChat();
+// Сохранение демо-сообщений в localStorage
+function saveDemoMessages() {
+    if (demoMode) {
+        localStorage.setItem("darkchat_demo_messages", JSON.stringify(localMessages));
+    }
 }
 
-function showChat() {
-    loginScreen.classList.add('hidden');
-    chatScreen.classList.remove('hidden');
-    currentUsernameSpan.innerText = currentUser.nickname;
-    loadMessages();
-    listenTyping();
-    messageInput.value = "";
-    updateCharCounter();
-    messageInput.focus();
-}
-
-function logout() {
-    if (messagesListener) messagesListener.off();
-    if (typingRef && currentUser) typingRef.child(currentUser.nickname).remove();
-    currentUser = null;
-    localStorage.removeItem("darkchat_user");
-    loginScreen.classList.remove('hidden');
-    chatScreen.classList.add('hidden');
-    messagesContainer.innerHTML = `<div class="empty-state" id="emptyState"><div class="empty-emoji">💬</div><p>Нет сообщений</p></div>`;
-}
-
-// Отрисовка сообщений с кнопками копирования и удаления (только для своих)
+// ---------- ОТРИСОВКА СООБЩЕНИЙ (общая для Firebase и демо) ----------
 function renderMessages(messagesArray) {
     if (!messagesContainer) return;
     const wasAtBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight < 50;
-    // очищаем, кроме empty-state
+    // Очищаем контейнер, кроме empty-state
     const children = [...messagesContainer.children];
     children.forEach(c => { if (c.id !== 'emptyState') c.remove(); });
     const emptyDiv = document.getElementById('emptyState');
@@ -135,8 +133,7 @@ function renderMessages(messagesArray) {
         const isOwn = (currentUser && msg.sender === currentUser.nickname);
         const msgDiv = document.createElement('div');
         msgDiv.className = `message-item ${isOwn ? 'own-message' : ''}`;
-        msgDiv.setAttribute('data-msg-id', msg.id);
-        // Экранируем текст для атрибута data-text (чтобы кавычки не ломали)
+        msgDiv.setAttribute('data-msg-id', msg.id || msg._localId);
         const escapedText = escapeHtml(msg.text).replace(/"/g, '&quot;');
         msgDiv.innerHTML = `
             <div class="message-bubble">
@@ -148,22 +145,20 @@ function renderMessages(messagesArray) {
             </div>
             <div class="message-actions">
                 <button class="action-btn copy-btn" data-text="${escapedText}">📋 Копировать</button>
-                ${isOwn ? `<button class="action-btn delete-btn" data-id="${msg.id}">🗑️ Удалить</button>` : ''}
+                ${isOwn ? `<button class="action-btn delete-btn" data-id="${msg.id || msg._localId}">🗑️ Удалить</button>` : ''}
             </div>
         `;
         messagesContainer.appendChild(msgDiv);
     });
-    // Назначаем обработчики после вставки
+    // Обработчики кнопок
     document.querySelectorAll('.copy-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const text = btn.getAttribute('data-text');
-            // восстанавливаем экранированные кавычки (если были)
-            const originalText = text.replace(/&quot;/g, '"');
-            navigator.clipboard.writeText(originalText).then(() => {
-                const oldText = btn.innerHTML;
+            const text = btn.getAttribute('data-text').replace(/&quot;/g, '"');
+            navigator.clipboard.writeText(text).then(() => {
+                const oldHTML = btn.innerHTML;
                 btn.innerHTML = '✅ Скопировано';
-                setTimeout(() => { if(btn) btn.innerHTML = oldText; }, 1000);
+                setTimeout(() => { if(btn) btn.innerHTML = oldHTML; }, 1000);
             }).catch(() => alert('Не удалось скопировать'));
         });
     });
@@ -171,16 +166,27 @@ function renderMessages(messagesArray) {
         btn.addEventListener('click', async (e) => {
             e.stopPropagation();
             const msgId = btn.getAttribute('data-id');
-            if (confirm('Удалить это сообщение?')) {
-                await messagesRef.child(msgId).remove();
+            if (confirm('Удалить сообщение?')) {
+                if (demoMode) {
+                    localMessages = localMessages.filter(m => (m.id || m._localId) != msgId);
+                    saveDemoMessages();
+                    renderMessages(localMessages);
+                } else if (messagesRef) {
+                    await messagesRef.child(msgId).remove();
+                }
             }
         });
     });
     if (wasAtBottom) messagesContainer.scrollTo({ top: messagesContainer.scrollHeight, behavior: 'smooth' });
 }
 
-// Загрузка сообщений из БД (реалтайм)
+// ---------- ЗАГРУЗКА СООБЩЕНИЙ ----------
 function loadMessages() {
+    if (demoMode) {
+        renderMessages(localMessages);
+        // В демо-режиме нет реального времени, но можно имитировать обновление через таймер (не нужно)
+        return;
+    }
     if (!messagesRef) return;
     if (messagesListener) messagesListener.off();
     messagesListener = messagesRef.orderByChild('timestamp').limitToLast(50).on('value', (snap) => {
@@ -193,24 +199,54 @@ function loadMessages() {
     });
 }
 
-// Отправка сообщения
+// ---------- ОТПРАВКА СООБЩЕНИЯ ----------
 async function sendMessage() {
     if (!currentUser) return;
     const text = messageInput.value.trim();
     if (text === "") return;
-    await messagesRef.push({
-        sender: currentUser.nickname,
-        text: text,
-        timestamp: Date.now()
-    });
-    messageInput.value = "";
-    updateCharCounter();
-    clearTypingStatus();
+    if (demoMode) {
+        const newMsg = {
+            _localId: Date.now() + Math.random(),
+            sender: currentUser.nickname,
+            text: text,
+            timestamp: Date.now()
+        };
+        localMessages.push(newMsg);
+        saveDemoMessages();
+        renderMessages(localMessages);
+        messageInput.value = "";
+        updateCharCounter();
+        clearTypingStatus();
+    } else if (messagesRef) {
+        await messagesRef.push({
+            sender: currentUser.nickname,
+            text: text,
+            timestamp: Date.now()
+        });
+        messageInput.value = "";
+        updateCharCounter();
+        clearTypingStatus();
+    }
 }
 
-// Индикатор "печатает"
+// ---------- ИНДИКАТОР ПЕЧАТАЕТ (демо и Firebase) ----------
 function updateTypingStatus(isTyping) {
-    if (!currentUser || !typingRef) return;
+    if (!currentUser) return;
+    if (demoMode) {
+        if (isTyping) {
+            localTypingUsers[currentUser.nickname] = Date.now();
+            if (typingTimeout) clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                delete localTypingUsers[currentUser.nickname];
+                updateTypingDisplay();
+            }, 1500);
+        } else {
+            delete localTypingUsers[currentUser.nickname];
+        }
+        updateTypingDisplay();
+        return;
+    }
+    if (!typingRef) return;
     if (isTyping) {
         typingRef.child(currentUser.nickname).set({ name: currentUser.nickname, timestamp: Date.now() });
         if (typingTimeout) clearTimeout(typingTimeout);
@@ -219,20 +255,35 @@ function updateTypingStatus(isTyping) {
         typingRef.child(currentUser.nickname).remove();
     }
 }
-function clearTypingStatus() {
-    if (typingRef && currentUser) typingRef.child(currentUser.nickname).remove();
-    if (typingTimeout) clearTimeout(typingTimeout);
-}
-function listenTyping() {
-    if (!typingRef) return;
-    typingRef.on('value', (snap) => {
-        const users = snap.val();
-        if (!users || Object.keys(users).length === 0) {
+
+function updateTypingDisplay() {
+    if (demoMode) {
+        const users = Object.keys(localTypingUsers).filter(u => u !== currentUser?.nickname);
+        if (users.length === 0) {
             typingDiv.classList.add('hidden');
             return;
         }
-        const typingList = Object.keys(users).filter(u => u !== currentUser?.nickname);
-        if (typingList.length === 0) { typingDiv.classList.add('hidden'); return; }
+        let text = '';
+        if (users.length === 1) text = `${users[0]} печатает...`;
+        else if (users.length === 2) text = `${users[0]} и ${users[1]} печатают...`;
+        else text = `Несколько человек печатают...`;
+        typingTextSpan.innerText = text;
+        typingDiv.classList.remove('hidden');
+        return;
+    }
+    // Firebase версия
+    if (!typingRef) return;
+    typingRef.on('value', (snap) => {
+        const usersData = snap.val();
+        if (!usersData) {
+            typingDiv.classList.add('hidden');
+            return;
+        }
+        const typingList = Object.keys(usersData).filter(u => u !== currentUser?.nickname);
+        if (typingList.length === 0) {
+            typingDiv.classList.add('hidden');
+            return;
+        }
         let text = '';
         if (typingList.length === 1) text = `${typingList[0]} печатает...`;
         else if (typingList.length === 2) text = `${typingList[0]} и ${typingList[1]} печатают...`;
@@ -242,14 +293,89 @@ function listenTyping() {
     });
 }
 
+function clearTypingStatus() {
+    if (demoMode) {
+        delete localTypingUsers[currentUser?.nickname];
+        updateTypingDisplay();
+        return;
+    }
+    if (typingRef && currentUser) typingRef.child(currentUser.nickname).remove();
+    if (typingTimeout) clearTimeout(typingTimeout);
+}
+
+function listenTyping() {
+    if (demoMode) {
+        // В демо-режиме просто запускаем обновление отображения
+        setInterval(() => {
+            // Очищаем старые статусы (старше 2 сек)
+            const now = Date.now();
+            for (let u in localTypingUsers) {
+                if (now - localTypingUsers[u] > 2000) delete localTypingUsers[u];
+            }
+            updateTypingDisplay();
+        }, 1000);
+        return;
+    }
+    if (typingRef) {
+        updateTypingDisplay();  // первичная установка слушателя
+    }
+}
+
+// ---------- ВХОД И ВЫХОД ----------
+function enterChat() {
+    const nick = nicknameInput.value.trim();
+    if (nick.length < 2) {
+        alert("Никнейм должен быть не менее 2 символов");
+        return;
+    }
+    currentUser = { nickname: nick };
+    localStorage.setItem("darkchat_user", nick);
+    showChat();
+}
+
+function showChat() {
+    loginScreen.classList.add('hidden');
+    chatScreen.classList.remove('hidden');
+    currentUsernameSpan.innerText = currentUser.nickname;
+    if (demoMode) {
+        console.log("Демо-режим: сообщения хранятся только локально.");
+        if (localMessages.length === 0) {
+            // Добавим приветственное сообщение для демо
+            localMessages.push({
+                _localId: Date.now(),
+                sender: "System",
+                text: "Добро пожаловать в демо-чат! Для полноценной работы настройте Firebase.",
+                timestamp: Date.now()
+            });
+            saveDemoMessages();
+        }
+    }
+    loadMessages();
+    listenTyping();
+    messageInput.value = "";
+    updateCharCounter();
+    messageInput.focus();
+}
+
+function logout() {
+    if (messagesListener && !demoMode) messagesListener.off();
+    if (typingRef && !demoMode && currentUser) typingRef.child(currentUser.nickname).remove();
+    currentUser = null;
+    localStorage.removeItem("darkchat_user");
+    loginScreen.classList.remove('hidden');
+    chatScreen.classList.add('hidden');
+    // Сбрасываем сообщения
+    messagesContainer.innerHTML = `<div class="empty-state" id="emptyState"><div class="empty-emoji">💬</div><p>Нет сообщений</p></div>`;
+}
+
 function updateCharCounter() {
     charCounter.innerText = `${messageInput.value.length}/500`;
 }
 
-// Автовосстановление сессии
+// Автовход
 function tryAutoLogin() {
     const savedNick = localStorage.getItem("darkchat_user");
-    if (savedNick && firebaseReady) {
+    if (savedNick && savedNick.length >= 2) {
         currentUser = { nickname: savedNick };
         showChat();
         return true;
@@ -257,7 +383,7 @@ function tryAutoLogin() {
     return false;
 }
 
-// События
+// ---------- НАСТРОЙКА СОБЫТИЙ ----------
 loginBtn.addEventListener('click', enterChat);
 logoutBtn.addEventListener('click', logout);
 sendBtn.addEventListener('click', sendMessage);
@@ -271,19 +397,15 @@ messageInput.addEventListener('input', () => {
     }
 });
 messageInput.addEventListener('blur', () => updateTypingStatus(false));
-messagesContainer.addEventListener('scroll', () => {
-    const { scrollTop, scrollHeight, clientHeight } = messagesContainer;
-    window._isAtBottom = scrollHeight - scrollTop - clientHeight < 30;
-});
 
-// Запуск
+// Запуск при загрузке
 window.addEventListener('DOMContentLoaded', () => {
-    if (firebaseReady) {
-        if (!tryAutoLogin()) {
-            loginScreen.classList.remove('hidden');
-            chatScreen.classList.add('hidden');
-        }
-    } else {
+    if (!tryAutoLogin()) {
         loginScreen.classList.remove('hidden');
+        chatScreen.classList.add('hidden');
+    }
+    // Если демо-режим и нет сообщений, покажем подсказку
+    if (demoMode && localMessages.length === 0) {
+        console.log("Демо-режим активен. Для сохранения сообщений настройте Firebase.");
     }
 });
