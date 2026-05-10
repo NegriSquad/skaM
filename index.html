@@ -60,7 +60,7 @@
 
     <!-- ОСНОВНОЙ ИНТЕРФЕЙС -->
     <div id="mainAppScreen" class="chats-layout hidden">
-        <!-- Левая панель диалогов -->
+        <!-- Левая панель диалогов (выезжающая на телефоне) -->
         <div class="chats-sidebar" id="chatsSidebar">
             <div class="sidebar-header">
                 <div class="user-info">
@@ -89,18 +89,15 @@
         <div class="chat-area">
             <div class="chat-header">
                 <div class="header-left">
-                    <button id="mobileMenuBtn" class="mobile-back">☰</button>
-                    <h2 id="currentChatTitle">Выберите диалог</h2>
-                </div>
-                <div class="online-status-indicator" id="chatOnlineBadge" style="display: none;">
-                    <span class="pulse-dot"></span>
-                    <span>онлайн</span>
+                    <button id="backToDialogsBtn" class="back-btn">←</button>
+                    <h2 id="currentChatTitle">DarkChat</h2>
                 </div>
             </div>
             <div class="messages-container" id="messagesContainer">
                 <div class="empty-state" id="emptyState">
                     <div class="empty-emoji">💬</div>
-                    <p>Выберите диалог слева</p>
+                    <p>Выберите диалог</p>
+                    <span style="font-size: 0.8rem; opacity: 0.6;">Нажмите ← чтобы открыть список</span>
                 </div>
             </div>
             <div id="typingIndicatorContainer" class="typing-indicator hidden">
