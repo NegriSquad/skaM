@@ -3,31 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>DarkChat | Мессенджер с паролем</title>
+    <title>DarkChat | Мессенджер</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 </head>
 <body>
     <div class="app-wrapper">
-        <!-- ЭКРАН ВХОДА (С ПАРОЛЕМ) -->
+        <!-- ЭКРАН ВХОДА (только ник) -->
         <div id="loginScreen" class="login-screen">
             <div class="login-card glass-effect">
-                <div class="logo-icon">🔐💬</div>
+                <div class="logo-icon">💬✨</div>
                 <h1>Dark<span style="color:#5865f2;">Chat</span></h1>
-                <p class="subtitle">Вход или регистрация</p>
+                <p class="subtitle">Введите ваш никнейм</p>
                 <div class="input-group">
                     <label>👤 Никнейм</label>
                     <input type="text" id="nicknameInput" placeholder="Анна, Дмитрий..." maxlength="28" autocomplete="off">
                 </div>
-                <div class="input-group">
-                    <label>🔑 Пароль</label>
-                    <input type="password" id="passwordInput" placeholder="••••••" maxlength="50">
-                </div>
-                <button id="loginBtn" class="btn-primary">🚀 Войти / Зарегистрироваться</button>
+                <button id="loginBtn" class="btn-primary">🚀 Войти в чат</button>
                 <div class="security-note">
-                    ⚠️ Пароль хранится в открытом виде (учебный проект).<br>
-                    Для реального использования добавьте хеширование.
+                    ✨ Сообщения видны всем • Можно удалять свои и копировать любые
                 </div>
             </div>
         </div>
@@ -47,7 +42,7 @@
                         <span class="user-avatar">👤</span>
                         <span class="user-name" id="currentUsernameDisplay"></span>
                     </div>
-                    <button id="logoutBtn" class="icon-btn" title="Выйти">🚪</button>
+                    <button id="logoutBtn" class="icon-btn" title="Сменить ник">🚪</button>
                 </div>
             </div>
 
@@ -69,7 +64,7 @@
                     <button id="sendBtn" class="send-button">➤</button>
                 </div>
                 <div class="input-footer">
-                    <span class="helper-text">↵ Enter</span>
+                    <span class="helper-text">↵ Enter для отправки</span>
                     <span id="charCounter">0/500</span>
                 </div>
             </div>
