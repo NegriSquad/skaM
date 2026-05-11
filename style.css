@@ -1287,3 +1287,118 @@ svg {
     height: 24px;
     fill: white;
 }
+/* Стили для видео и голосовых сообщений */
+.attach-btn, .voice-btn {
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: transparent;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    transition: all 0.2s ease;
+}
+
+.attach-btn:hover, .voice-btn:hover {
+    background: var(--panel-soft);
+    color: var(--accent);
+}
+
+.voice-btn.recording {
+    color: var(--danger);
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.1); opacity: 0.7; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.recording-status {
+    color: var(--danger);
+    font-weight: 600;
+}
+
+/* Видео сообщение */
+.message-video {
+    max-width: 300px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #000;
+}
+
+.message-video video {
+    width: 100%;
+    max-height: 300px;
+    cursor: pointer;
+}
+
+/* Голосовое сообщение */
+.message-voice {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 200px;
+    background: var(--panel-soft);
+    padding: 8px 12px;
+    border-radius: 12px;
+}
+
+.voice-play-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: var(--accent);
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.voice-wave {
+    flex: 1;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.voice-wave span {
+    width: 3px;
+    background: var(--accent);
+    border-radius: 2px;
+    animation: wave 0.8s ease-in-out infinite;
+}
+
+.voice-wave span:nth-child(1) { height: 10px; animation-delay: 0s; }
+.voice-wave span:nth-child(2) { height: 20px; animation-delay: 0.1s; }
+.voice-wave span:nth-child(3) { height: 30px; animation-delay: 0.2s; }
+.voice-wave span:nth-child(4) { height: 20px; animation-delay: 0.3s; }
+.voice-wave span:nth-child(5) { height: 10px; animation-delay: 0.4s; }
+
+@keyframes wave {
+    0%, 100% { transform: scaleY(1); }
+    50% { transform: scaleY(0.5); }
+}
+
+.voice-duration {
+    font-size: 12px;
+    color: var(--muted);
+    min-width: 45px;
+}
+
+.message-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#messageInput {
+    flex: 1;
+}
