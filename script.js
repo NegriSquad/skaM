@@ -34,6 +34,7 @@ document.addEventListener("DOMContentLoaded", () => {
     bindElements();
     bindEvents();
     updateCharCounter();
+    initScrollHandler();
     auth.onAuthStateChanged(handleAuthState);
 });
 
@@ -100,9 +101,14 @@ function bindEvents() {
         }
     });
     els.messageInput.addEventListener("blur", () => updateTyping(false));
-    els.messagesContainer.addEventListener("scroll", () => {
-        updateScrollState();
-    });
+}
+
+function initScrollHandler() {
+    if (els.messagesContainer) {
+        els.messagesContainer.addEventListener("scroll", () => {
+            updateScrollState();
+        });
+    }
 }
 
 async function handleAuthState(user) {
@@ -565,6 +571,7 @@ async function sendOrUpdateMessage() {
             });
             await updateChatLastMessage(text);
             cancelEditMessage();
+            scrollMessagesToBottom(true);
             return;
         }
 
@@ -579,6 +586,7 @@ async function sendOrUpdateMessage() {
         els.messageInput.value = "";
         updateCharCounter();
         await clearTypingIndicator();
+        scrollMessagesToBottom(true);
     } catch (error) {
         alert(`Не удалось отправить сообщение: ${error.message}`);
     }
@@ -807,26 +815,17 @@ function compressAvatar(file) {
     });
 }
 
-function scrollMessagesDebug(){
-        window.scrollTo(x, y)
-        requestAnimationFrame(() => {
-        els.messagesContainer.scrollTo({
-            top: els.messagesContainer.scrollHeight,
-            behavior: "smooth"
-        });
-        state.isAtBottom = true;
-        window.setTimeout(updateScrollState, 220);
-    });
-}
-
 function scrollMessagesToBottom(smooth) {
     requestAnimationFrame(() => {
-        els.messagesContainer.scrollTo({
-            top: els.messagesContainer.scrollHeight,
+        const container = els.messagesContainer;
+        if (!container) return;
+        
+        container.scrollTo({
+            top: container.scrollHeight,
             behavior: smooth ? "smooth" : "auto"
         });
         state.isAtBottom = true;
-        window.setTimeout(updateScrollState, smooth ? 220 : 0);
+        setTimeout(updateScrollState, smooth ? 200 : 0);
     });
 }
 
@@ -836,11 +835,15 @@ function updateScrollState() {
         return;
     }
 
-    const { scrollTop, scrollHeight, clientHeight } = els.messagesContainer;
+    const container = els.messagesContainer;
+    if (!container) return;
+    
+    const { scrollTop, scrollHeight, clientHeight } = container;
     const hasOverflow = scrollHeight > clientHeight + 24;
-    state.isAtBottom = scrollHeight - scrollTop - clientHeight < 96;
-    els.scrollBottomBtn.classList.toggle("hidden", !hasOverflow);
-    els.scrollBottomBtn.classList.toggle("at-bottom", state.isAtBottom);
+    const isBottom = scrollHeight - scrollTop - clientHeight < 96;
+    state.isAtBottom = isBottom;
+    
+    els.scrollBottomBtn.classList.toggle("hidden", !hasOverflow || isBottom);
 }
 
 function normalizeUsername(value) {
