@@ -1204,3 +1204,69 @@ function toggleVideo() {
         }
     }
 }
+// ========== FIX SCROLL ==========
+(function fixScroll() {
+    const container = document.getElementById('messagesContainer');
+    const scrollBtn = document.getElementById('scrollBottomBtn');
+    
+    if (!container) {
+        console.log('Waiting for messagesContainer...');
+        setTimeout(fixScroll, 500);
+        return;
+    }
+    
+    console.log('Scroll fix applied!');
+    
+    // Стили для полосы прокрутки
+    container.style.overflowY = 'auto';
+    container.style.overflowX = 'hidden';
+    
+    // Функция прокрутки вниз
+    window.scrollToBottom = function(smooth = true) {
+        setTimeout(() => {
+            container.scrollTo({
+                top: container.scrollHeight,
+                behavior: smooth ? 'smooth' : 'auto'
+            });
+        }, 50);
+    };
+    
+    // Обновление видимости кнопки
+    function updateBtn() {
+        if (!scrollBtn) return;
+        const isBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+        scrollBtn.classList.toggle('hidden', isBottom);
+    }
+    
+    // Обработчик скролла
+    container.addEventListener('scroll', updateBtn);
+    
+    // Кнопка скролла
+    if (scrollBtn) {
+        scrollBtn.addEventListener('click', () => window.scrollToBottom(true));
+    }
+    
+    // Наблюдатель за новыми сообщениями
+    const observer = new MutationObserver(() => {
+        updateBtn();
+        // Авто-скролл если был внизу
+        const wasAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+        if (wasAtBottom) {
+            window.scrollToBottom(false);
+        }
+    });
+    
+    observer.observe(container, { childList: true, subtree: true });
+    
+    // Первоначальная прокрутка
+    setTimeout(() => window.scrollToBottom(false), 500);
+})();
+
+// Перехватываем отправку сообщений для скролла
+const originalSend = window.sendOrUpdateMessage;
+if (originalSend) {
+    window.sendOrUpdateMessage = async function() {
+        await originalSend();
+        setTimeout(() => window.scrollToBottom(true), 100);
+    };
+}
