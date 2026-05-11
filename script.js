@@ -362,4 +362,41 @@ document.addEventListener('touchend', (e) => {
     if (swipeDistance < -50 && window.innerWidth <= 768 && sidebar2.classList.contains('open')) {
         closeSidebar();
     }
+    // ========== МОБИЛЬНАЯ НАВИГАЦИЯ (ДИАЛОГИ - ОСНОВНОЙ ЭКРАН) ==========
+const chatArea = document.getElementById('chatArea');
+const backToDialogs = document.getElementById('backToDialogsBtn');
+
+function openChatMobile() {
+    if (window.innerWidth <= 768) {
+        chatArea.classList.add('open');
+    }
+}
+
+function closeChatMobile() {
+    if (window.innerWidth <= 768) {
+        chatArea.classList.remove('open');
+    }
+}
+
+// Кнопка назад закрывает чат и показывает диалоги
+if (backToDialogs) {
+    backToDialogs.addEventListener('click', closeChatMobile);
+}
+
+// Переопределяем openChat, чтобы при выборе диалога открывался чат поверх
+const originalOpenChatMobile2 = openChat;
+window.openChat = function(chatId, partner) {
+    originalOpenChatMobile2(chatId, partner);
+    openChatMobile();
+};
+openChat = window.openChat;
+
+// При отправке сообщения на телефоне чат остается открытым (это правильно)
+
+// При загрузке диалогов на телефоне показываем список
+window.addEventListener('resize', () => {
+    if (window.innerWidth > 768) {
+        chatArea.classList.remove('open');
+    }
+});
 }, false);
