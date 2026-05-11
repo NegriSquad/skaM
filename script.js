@@ -1,3 +1,6 @@
+alert("Скрипт запущен!");
+console.log("Скрипт запущен!");
+
 const firebaseConfig = {
     apiKey: "AIzaSyD3NEXunS2PQPVQ3nDS27Nk4JIG3xajyVM",
     authDomain: "messendger-71e53.firebaseapp.com",
@@ -31,6 +34,7 @@ const state = {
 const els = {};
 
 document.addEventListener("DOMContentLoaded", () => {
+    alert("DOM загружен!");
     console.log("DOM загружен");
     bindElements();
     bindEvents();
@@ -56,15 +60,12 @@ function bindElements() {
     
     ids.forEach(id => {
         els[id] = document.getElementById(id);
-        if (!els[id] && id !== "scrollBottomBtn") {
+        if (!els[id]) {
             console.warn(`Элемент ${id} не найден`);
         }
     });
     
-    // Проверка важных элементов
-    console.log("messageInput найден:", !!els.messageInput);
-    console.log("messagesContainer найден:", !!els.messagesContainer);
-    console.log("sendBtn найден:", !!els.sendBtn);
+    alert(`messageInput найден: ${!!els.messageInput}, messagesContainer: ${!!els.messagesContainer}`);
 }
 
 function bindEvents() {
@@ -123,18 +124,15 @@ function bindEvents() {
 
 function initScrollHandler() {
     if (els.messagesContainer) {
-        console.log("Инициализация обработчика скролла");
         els.messagesContainer.addEventListener("scroll", () => {
             updateScrollState();
         });
-        // Первоначальная проверка
         updateScrollState();
-    } else {
-        console.error("messagesContainer не найден для обработчика скролла");
     }
 }
 
 async function handleAuthState(user) {
+    alert(`Auth state: ${user ? "user logged in" : "no user"}`);
     if (!user) {
         resetSession();
         showAuthScreen("login");
@@ -337,12 +335,6 @@ function removeSelectedAvatar() {
     updateProfilePreview();
 }
 
-["profileNickname", "profileUsername"].forEach(id => {
-    document.addEventListener("input", event => {
-        if (event.target && event.target.id === id) updateProfilePreview();
-    });
-});
-
 function listenDialogs() {
     if (state.dialogsListener) state.dialogsListener.ref.off("value", state.dialogsListener.callback);
 
@@ -491,6 +483,7 @@ function openChat(chatId, partner) {
     if (els.messageInput) {
         els.messageInput.disabled = false;
         els.messageInput.focus();
+        alert("Поле ввода включено!");
     }
     if (els.sendBtn) els.sendBtn.disabled = false;
 
@@ -592,11 +585,11 @@ function createMessageNode(message) {
 
 async function sendOrUpdateMessage() {
     if (!state.activeChatId || !state.activePartner) {
-        console.warn("Нет активного чата");
+        alert("Нет активного чата");
         return;
     }
     if (!els.messageInput) {
-        console.error("messageInput не найден");
+        alert("messageInput не найден");
         return;
     }
     
@@ -968,23 +961,3 @@ function messageAction(label, type) {
     button.textContent = label;
     return button;
 }
-// Диагностика
-setTimeout(() => {
-    console.log("=== ДИАГНОСТИКА ===");
-    console.log("messageInput:", els.messageInput);
-    console.log("messagesContainer:", els.messagesContainer);
-    console.log("sendBtn:", els.sendBtn);
-    console.log("activeChatId:", state.activeChatId);
-    console.log("messageInput disabled:", els.messageInput?.disabled);
-    
-    if (els.messagesContainer) {
-        console.log("messagesContainer styles:", window.getComputedStyle(els.messagesContainer).overflow);
-    }
-    
-    // Принудительно включаем поле ввода если есть активный чат
-    if (state.activeChatId && els.messageInput) {
-        els.messageInput.disabled = false;
-        els.sendBtn.disabled = false;
-        console.log("Поле ввода принудительно включено");
-    }
-}, 2000);
