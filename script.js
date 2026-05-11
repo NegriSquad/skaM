@@ -1,4 +1,4 @@
-// ==================== КОНФИГ FIREBASE (ТВОИ ДАННЫЕ) ====================
+// ==================== КОНФИГ FIREBASE ====================
 const firebaseConfig = {
     apiKey: "AIzaSyD3NEXunS2PQPVQ3nDS27Nk4JIG3xajyVM",
     authDomain: "messendger-71e53.firebaseapp.com",
@@ -9,6 +9,7 @@ const firebaseConfig = {
     appId: "1:1010287168963:web:15868f94480bb833414176"
 };
 
+// Инициализация Firebase
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.database();
@@ -30,7 +31,7 @@ let doRegisterBtn, regEmail, regUsername, regNickname, regPassword, showLoginFro
 let globalLogoutBtn, sidebarUsername;
 let dialogsList, searchUserInput, searchUserBtn, searchResults;
 let messagesContainer, messageInput, sendBtn, charCounterSpan;
-let typingIndicator, typingText, currentChatTitle, backToDialogsBtn;
+let typingIndicator, typingText, currentChatTitle, backToDialogsBtn, chatArea;
 
 // ========== ВСПОМОГАТЕЛЬНЫЕ ==========
 function escapeHtml(str) {
@@ -39,7 +40,8 @@ function escapeHtml(str) {
 }
 function formatTime(ts) { return new Date(ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }
 function formatDateGroup(ts) {
-    const d = new Date(ts), today = new Date(), yest = new Date(today); yest.setDate(today.getDate()-1);
+    const d = new Date(ts), today = new Date(), yest = new Date(today); 
+    yest.setDate(today.getDate()-1);
     if(d.toDateString()===today.toDateString()) return "Сегодня";
     if(d.toDateString()===yest.toDateString()) return "Вчера";
     return d.toLocaleDateString('ru-RU', {day:'numeric', month:'long'});
@@ -65,7 +67,8 @@ function renderMessages(messagesArray, currentUserId, partnerNick) {
     sorted.forEach(msg => {
         const dl = formatDateGroup(msg.timestamp);
         if(lastDate !== dl) {
-            const div = document.createElement('div'); div.className = 'date-divider';
+            const div = document.createElement('div'); 
+            div.className = 'date-divider';
             div.innerHTML = `<span>${dl}</span>`;
             messagesContainer.appendChild(div);
             lastDate = dl;
@@ -116,7 +119,7 @@ async function sendPrivateMessage() {
             partnerId: currentUser.uid, partnerName: currentUserData.nickname, partnerUsername: currentUserData.username
         });
         clearTypingIndicator();
-    } catch(e) { alert("Ошибка: "+e.message); }
+    } catch(e) { console.error(e); alert("Ошибка отправки: "+e.message); }
 }
 
 function updateTyping(isTyping) {
@@ -126,20 +129,31 @@ function updateTyping(isTyping) {
         typingRef.child(currentUser.uid).set({ name: currentUserData.nickname, timestamp: Date.now() });
         if(typingTimeout) clearTimeout(typingTimeout);
         typingTimeout = setTimeout(() => typingRef.child(currentUser.uid).remove(), 1500);
-    } else { typingRef.child(currentUser.uid).remove(); if(typingTimeout) clearTimeout(typingTimeout); }
+    } else { 
+        typingRef.child(currentUser.uid).remove(); 
+        if(typingTimeout) clearTimeout(typingTimeout); 
+    }
 }
-function clearTypingIndicator() { if(activeChatId && currentUser) db.ref(`typing/${activeChatId}/${currentUser.uid}`).remove(); }
+function clearTypingIndicator() { 
+    if(activeChatId && currentUser) db.ref(`typing/${activeChatId}/${currentUser.uid}`).remove(); 
+}
 function listenTyping(chatId) {
     if(typingListener) typingListener.off();
     const typingRef = db.ref(`typing/${chatId}`);
     typingListener = typingRef.on('value', snap => {
         if(!activeChatId || activeChatId !== chatId) return;
         const data = snap.val();
-        if(!data) { typingIndicator.classList.add('hidden'); return; }
+        if(!data) { 
+            if(typingIndicator) typingIndicator.classList.add('hidden'); 
+            return; 
+        }
         const users = Object.keys(data).filter(uid => uid !== currentUser.uid);
-        if(users.length===0) { typingIndicator.classList.add('hidden'); return; }
-        typingText.innerText = users.length===1 ? `${data[users[0]].name} печатает...` : 'Несколько печатают...';
-        typingIndicator.classList.remove('hidden');
+        if(users.length===0) { 
+            if(typingIndicator) typingIndicator.classList.add('hidden'); 
+            return; 
+        }
+        if(typingText) typingText.innerText = users.length===1 ? `${data[users[0]].name} печатает...` : 'Несколько печатают...';
+        if(typingIndicator) typingIndicator.classList.remove('hidden');
     });
 }
 
@@ -148,8 +162,11 @@ async function loadDialogs() {
     if(!currentUser) return;
     db.ref(`user_chats/${currentUser.uid}`).on('value', snap => {
         const chats = snap.val();
-        dialogsList.innerHTML = '';
-        if(!chats) { dialogsList.innerHTML = '<div class="empty-dialogs">Нет диалогов</div>'; return; }
+        if(dialogsList) dialogsList.innerHTML = '';
+        if(!chats) { 
+            if(dialogsList) dialogsList.innerHTML = '<div class="empty-dialogs">Нет диалогов</div>'; 
+            return; 
+        }
         const sorted = Object.entries(chats).sort((a,b)=>(b[1].lastTimestamp||0)-(a[1].lastTimestamp||0));
         sorted.forEach(([chatId, info]) => {
             const partnerName = info.partnerName || info.partnerUsername;
@@ -157,8 +174,12 @@ async function loadDialogs() {
             const div = document.createElement('div');
             div.className = 'dialog-item';
             div.innerHTML = `<div class="dialog-avatar">👤</div><div class="dialog-info"><div class="dialog-name">${escapeHtml(partnerName)}</div><div class="dialog-last">${escapeHtml(lastMsg.substring(0,40))}</div></div>`;
-            div.onclick = () => openChat(chatId, { uid: info.partnerId, nickname: info.partnerName, username: info.partnerUsername });
-            dialogsList.appendChild(div);
+            div.onclick = (function(cId, pInfo) {
+                return function() { 
+                    openChat(cId, { uid: pInfo.partnerId, nickname: pInfo.partnerName, username: pInfo.partnerUsername });
+                };
+            })(chatId, info);
+            if(dialogsList) dialogsList.appendChild(div);
         });
     });
 }
@@ -168,22 +189,28 @@ async function searchUserByUsername(username) {
     if(!clean) return;
     const usersMap = (await db.ref('usernames').once('value')).val() || {};
     let foundUid = null;
-    for(let [uid, uname] of Object.entries(usersMap)) if(uname === clean && uid !== currentUser.uid) { foundUid = uid; break; }
+    for(let [uid, uname] of Object.entries(usersMap)) {
+        if(uname === clean && uid !== currentUser.uid) { 
+            foundUid = uid; 
+            break; 
+        }
+    }
     if(!foundUid) {
-        searchResults.innerHTML = '<div class="search-result-item">Пользователь не найден</div>';
-        searchResults.classList.remove('hidden');
+        if(searchResults) {
+            searchResults.innerHTML = '<div class="search-result-item">Пользователь не найден</div>';
+            searchResults.classList.remove('hidden');
+        }
         return;
     }
     const userData = (await db.ref(`users/${foundUid}`).once('value')).val();
-    searchResults.innerHTML = `<div class="search-result-item"><span>@${userData.username} — ${userData.nickname}</span><button class="start-chat-btn">Написать</button></div>`;
-    searchResults.classList.remove('hidden');
-    // Используем делегирование или безопасное добавление
-    const btn = searchResults.querySelector('.start-chat-btn');
-    if(btn) {
-        // Убираем предыдущие слушатели, чтобы не дублировать
-        const newBtn = btn.cloneNode(true);
-        btn.parentNode.replaceChild(newBtn, btn);
-        newBtn.addEventListener('click', () => startDialogWith(foundUid, userData));
+    if(searchResults) {
+        searchResults.innerHTML = `<div class="search-result-item"><span>@${userData.username} — ${userData.nickname}</span><button class="start-chat-btn">Написать</button></div>`;
+        searchResults.classList.remove('hidden');
+        
+        const startBtn = searchResults.querySelector('.start-chat-btn');
+        if(startBtn) {
+            startBtn.onclick = () => startDialogWith(foundUid, userData);
+        }
     }
 }
 
@@ -191,63 +218,106 @@ async function startDialogWith(uid, userData) {
     const chatId = [currentUser.uid, uid].sort().join('_');
     const exists = (await db.ref(`user_chats/${currentUser.uid}/${chatId}`).once('value')).exists();
     if(!exists) {
-        await db.ref(`user_chats/${currentUser.uid}/${chatId}`).set({ partnerId: uid, partnerName: userData.nickname, partnerUsername: userData.username, lastTimestamp: Date.now(), lastMessage: '' });
-        await db.ref(`user_chats/${uid}/${chatId}`).set({ partnerId: currentUser.uid, partnerName: currentUserData.nickname, partnerUsername: currentUserData.username, lastTimestamp: Date.now(), lastMessage: '' });
+        await db.ref(`user_chats/${currentUser.uid}/${chatId}`).set({ 
+            partnerId: uid, partnerName: userData.nickname, partnerUsername: userData.username, 
+            lastTimestamp: Date.now(), lastMessage: '' 
+        });
+        await db.ref(`user_chats/${uid}/${chatId}`).set({ 
+            partnerId: currentUser.uid, partnerName: currentUserData.nickname, partnerUsername: currentUserData.username, 
+            lastTimestamp: Date.now(), lastMessage: '' 
+        });
     }
     openChat(chatId, { uid, nickname: userData.nickname, username: userData.username });
-    searchResults.classList.add('hidden');
-    searchUserInput.value = '';
+    if(searchResults) searchResults.classList.add('hidden');
+    if(searchUserInput) searchUserInput.value = '';
 }
 
+// ========== ОСНОВНАЯ ФУНКЦИЯ OPENCHAT ==========
 function openChat(chatId, partner) {
+    console.log("openChat вызван", chatId, partner);
     activeChatId = chatId;
     activeChatPartner = partner;
-    currentChatTitle.innerText = partner.nickname;
-    messagesContainer.innerHTML = '<div class="empty-state" id="emptyState"><div class="empty-emoji">💬</div><p>Напишите первое сообщение</p></div>';
+    if(currentChatTitle) currentChatTitle.innerText = partner.nickname;
+    if(messagesContainer) {
+        messagesContainer.innerHTML = '<div class="empty-state" id="emptyState"><div class="empty-emoji">💬</div><p>Загрузка сообщений...</p></div>';
+    }
     startListeningMessages(chatId, partner);
     listenTyping(chatId);
-    if(window.innerWidth <= 550) document.querySelector('.chats-sidebar')?.classList.remove('mobile-open');
+    
+    // Открываем чат на телефоне
+    if (window.innerWidth <= 768 && chatArea) {
+        chatArea.classList.add('open');
+    }
 }
 
 // ========== АВТОРИЗАЦИЯ ==========
-function switchToLogin() { loginScreen.classList.remove('hidden'); registerScreen.classList.add('hidden'); }
-function switchToRegister() { loginScreen.classList.add('hidden'); registerScreen.classList.remove('hidden'); }
+function switchToLogin() { 
+    if(loginScreen) loginScreen.classList.remove('hidden'); 
+    if(registerScreen) registerScreen.classList.add('hidden'); 
+}
+function switchToRegister() { 
+    if(loginScreen) loginScreen.classList.add('hidden'); 
+    if(registerScreen) registerScreen.classList.remove('hidden'); 
+}
 function logout() {
     auth.signOut();
-    currentUser = null; currentUserData = null;
+    currentUser = null; 
+    currentUserData = null;
     if(messagesListener) messagesListener.off();
     if(typingListener) typingListener.off();
-    loginScreen.classList.remove('hidden');
-    mainAppScreen.classList.add('hidden');
+    if(loginScreen) loginScreen.classList.remove('hidden');
+    if(mainAppScreen) mainAppScreen.classList.add('hidden');
 }
 async function registerUser() {
-    const email = regEmail.value.trim(), username = regUsername.value.trim().toLowerCase(), nickname = regNickname.value.trim(), password = regPassword.value;
-    if(!email || !username || !nickname || password.length<6) return alert('Заполните все поля, пароль ≥6 символов');
-    if(!/^[a-z0-9_]+$/.test(username)) return alert('Только латиница, цифры, _');
+    const email = regEmail.value.trim(), 
+          username = regUsername.value.trim().toLowerCase(), 
+          nickname = regNickname.value.trim(), 
+          password = regPassword.value;
+    if(!email || !username || !nickname || password.length<6) {
+        alert('Заполните все поля, пароль ≥6 символов');
+        return;
+    }
+    if(!/^[a-z0-9_]+$/.test(username)) {
+        alert('Только латиница, цифры, _');
+        return;
+    }
     try {
         const {user} = await auth.createUserWithEmailAndPassword(email, password);
         await db.ref(`users/${user.uid}`).set({ email, username, nickname, createdAt: Date.now() });
         await db.ref(`usernames/${user.uid}`).set(username);
         alert('Регистрация успешна! Теперь войдите.');
         switchToLogin();
-    } catch(e) { alert('Ошибка: '+e.message); }
+    } catch(e) { 
+        alert('Ошибка: '+e.message);
+        console.error(e);
+    }
 }
 async function loginUser() {
-    const email = loginEmail.value.trim(), pwd = loginPassword.value;
+    const email = loginEmail.value.trim(), 
+          pwd = loginPassword.value;
+    if(!email || !pwd) {
+        alert('Введите email и пароль');
+        return;
+    }
     try {
         const {user} = await auth.signInWithEmailAndPassword(email, pwd);
         currentUser = user;
         const snap = await db.ref(`users/${user.uid}`).once('value');
         currentUserData = snap.val();
         if(!currentUserData) throw new Error('Нет данных пользователя');
-        sidebarUsername.innerText = `@${currentUserData.username}`;
-        loginScreen.classList.add('hidden');
-        mainAppScreen.classList.remove('hidden');
+        if(sidebarUsername) sidebarUsername.innerText = `@${currentUserData.username}`;
+        if(loginScreen) loginScreen.classList.add('hidden');
+        if(mainAppScreen) mainAppScreen.classList.remove('hidden');
         loadDialogs();
         activeChatId = null;
-        messagesContainer.innerHTML = '<div class="empty-state" id="emptyState"><div class="empty-emoji">💬</div><p>Выберите диалог</p></div>';
-        currentChatTitle.innerText = 'Выберите диалог';
-    } catch(e) { alert('Ошибка входа: '+e.message); }
+        if(messagesContainer) {
+            messagesContainer.innerHTML = '<div class="empty-state" id="emptyState"><div class="empty-emoji">💬</div><p>Выберите диалог из списка</p></div>';
+        }
+        if(currentChatTitle) currentChatTitle.innerText = 'DarkChat';
+    } catch(e) { 
+        alert('Ошибка входа: '+e.message);
+        console.error(e);
+    }
 }
 
 // ========== СТАРТ ПОСЛЕ ЗАГРУЗКИ DOM ==========
@@ -280,9 +350,11 @@ document.addEventListener('DOMContentLoaded', () => {
     typingText = document.getElementById('typingText');
     currentChatTitle = document.getElementById('currentChatTitle');
     backToDialogsBtn = document.getElementById('backToDialogsBtn');
+    chatArea = document.getElementById('chatArea');
 
     // Проверка наличия критических элементов
     if(!loginScreen || !registerScreen || !mainAppScreen) {
+        console.error("Ошибка: не найдены основные экраны");
         alert("Ошибка: не найдены основные экраны. Проверь index.html");
         return;
     }
@@ -294,109 +366,49 @@ document.addEventListener('DOMContentLoaded', () => {
     if(showLoginFromRegBtn) showLoginFromRegBtn.addEventListener('click', switchToLogin);
     if(globalLogoutBtn) globalLogoutBtn.addEventListener('click', logout);
     if(sendBtn) sendBtn.addEventListener('click', sendPrivateMessage);
-    if(searchUserBtn) searchUserBtn.addEventListener('click', () => searchUserByUsername(searchUserInput.value));
-    if(searchUserInput) searchUserInput.addEventListener('keypress', e => { if(e.key==='Enter') searchUserByUsername(searchUserInput.value); });
+    if(searchUserBtn) {
+        searchUserBtn.addEventListener('click', () => {
+            if(searchUserInput) searchUserByUsername(searchUserInput.value);
+        });
+    }
+    if(searchUserInput) {
+        searchUserInput.addEventListener('keypress', e => { 
+            if(e.key==='Enter') searchUserByUsername(searchUserInput.value); 
+        });
+    }
     if(messageInput) {
-        messageInput.addEventListener('input', () => { updateCharCounter(); updateTyping(true); clearTimeout(typingTimeout); typingTimeout = setTimeout(() => updateTyping(false), 1200); });
-        messageInput.addEventListener('keypress', e => { if(e.key==='Enter') sendPrivateMessage(); });
+        messageInput.addEventListener('input', () => { 
+            updateCharCounter(); 
+            updateTyping(true); 
+            clearTimeout(typingTimeout); 
+            typingTimeout = setTimeout(() => updateTyping(false), 1200); 
+        });
+        messageInput.addEventListener('keypress', e => { 
+            if(e.key==='Enter') sendPrivateMessage(); 
+        });
         messageInput.addEventListener('blur', () => updateTyping(false));
     }
-    if(messagesContainer) messagesContainer.addEventListener('scroll', () => { const {scrollTop,scrollHeight,clientHeight}=messagesContainer; isAtBottom = scrollHeight-scrollTop-clientHeight<30; });
-    if(backToDialogsBtn) backToDialogsBtn.addEventListener('click', () => { if(window.innerWidth<=550) document.querySelector('.chats-sidebar')?.classList.add('mobile-open'); });
+    if(messagesContainer) {
+        messagesContainer.addEventListener('scroll', () => { 
+            const {scrollTop,scrollHeight,clientHeight}=messagesContainer; 
+            isAtBottom = scrollHeight-scrollTop-clientHeight<30; 
+        });
+    }
     updateCharCounter();
 
+    // Кнопка назад закрывает чат на телефоне
+    if(backToDialogsBtn) {
+        backToDialogsBtn.addEventListener('click', function() {
+            if (window.innerWidth <= 768 && chatArea) {
+                chatArea.classList.remove('open');
+            }
+        });
+    }
+
     // Слушаем выход
-    auth.onAuthStateChanged(user => { if(!user && currentUser) logout(); });
+    auth.onAuthStateChanged(user => { 
+        if(!user && currentUser) logout(); 
+    });
+    
+    console.log("✅ Приложение загружено, Firebase готова");
 });
-// ========== МОБИЛЬНАЯ НАВИГАЦИЯ (TELEGRAM-STYLE) ==========
-const backBtn = document.getElementById('backToDialogsBtn');
-const sidebar2 = document.getElementById('chatsSidebar');
-const overlay = document.getElementById('sidebarOverlay');
-
-function openSidebar() {
-    if (window.innerWidth <= 768) {
-        sidebar2.classList.add('open');
-        overlay.classList.add('active');
-    }
-}
-
-function closeSidebar() {
-    sidebar2.classList.remove('open');
-    overlay.classList.remove('active');
-}
-
-// Кнопка назад показывает список диалогов
-if (backBtn) {
-    backBtn.addEventListener('click', openSidebar);
-}
-
-// Закрытие по оверлею
-if (overlay) {
-    overlay.addEventListener('click', closeSidebar);
-}
-
-// При выборе диалога - закрываем меню и показываем чат
-const originalOpenChatMobile = openChat;
-window.openChat = function(chatId, partner) {
-    originalOpenChatMobile(chatId, partner);
-    closeSidebar();
-};
-openChat = window.openChat;
-
-// Свайп вправо для открытия меню (опционально)
-let touchStartX = 0;
-let touchEndX = 0;
-
-document.addEventListener('touchstart', (e) => {
-    touchStartX = e.changedTouches[0].screenX;
-}, false);
-
-document.addEventListener('touchend', (e) => {
-    touchEndX = e.changedTouches[0].screenX;
-    const swipeDistance = touchEndX - touchStartX;
-    // Свайп вправо больше 50px
-    if (swipeDistance > 50 && window.innerWidth <= 768 && !sidebar2.classList.contains('open')) {
-        openSidebar();
-    }
-    // Свайп влево для закрытия
-    if (swipeDistance < -50 && window.innerWidth <= 768 && sidebar2.classList.contains('open')) {
-        closeSidebar();
-    }
-    // ========== МОБИЛЬНАЯ НАВИГАЦИЯ (ДИАЛОГИ - ОСНОВНОЙ ЭКРАН) ==========
-const chatArea = document.getElementById('chatArea');
-const backToDialogs = document.getElementById('backToDialogsBtn');
-
-function openChatMobile() {
-    if (window.innerWidth <= 768) {
-        chatArea.classList.add('open');
-    }
-}
-
-function closeChatMobile() {
-    if (window.innerWidth <= 768) {
-        chatArea.classList.remove('open');
-    }
-}
-
-// Кнопка назад закрывает чат и показывает диалоги
-if (backToDialogs) {
-    backToDialogs.addEventListener('click', closeChatMobile);
-}
-
-// Переопределяем openChat, чтобы при выборе диалога открывался чат поверх
-const originalOpenChatMobile2 = openChat;
-window.openChat = function(chatId, partner) {
-    originalOpenChatMobile2(chatId, partner);
-    openChatMobile();
-};
-openChat = window.openChat;
-
-// При отправке сообщения на телефоне чат остается открытым (это правильно)
-
-// При загрузке диалогов на телефоне показываем список
-window.addEventListener('resize', () => {
-    if (window.innerWidth > 768) {
-        chatArea.classList.remove('open');
-    }
-});
-}, false);
