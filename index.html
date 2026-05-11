@@ -60,7 +60,7 @@
 
     <!-- ОСНОВНОЙ ИНТЕРФЕЙС -->
     <div id="mainAppScreen" class="chats-layout hidden">
-        <!-- Левая панель диалогов (выезжающая на телефоне) -->
+        <!-- ЛЕВАЯ ПАНЕЛЬ (ДИАЛОГИ) - на телефоне это основной экран -->
         <div class="chats-sidebar" id="chatsSidebar">
             <div class="sidebar-header">
                 <div class="user-info">
@@ -82,11 +82,8 @@
             </div>
         </div>
 
-        <!-- Оверлей для мобильного меню -->
-        <div id="sidebarOverlay" class="sidebar-overlay"></div>
-
-        <!-- Правая область чата -->
-        <div class="chat-area">
+        <!-- ПРАВАЯ ОБЛАСТЬ (ЧАТ) - на телефоне открывается поверх -->
+        <div class="chat-area" id="chatArea">
             <div class="chat-header">
                 <div class="header-left">
                     <button id="backToDialogsBtn" class="back-btn">←</button>
@@ -96,8 +93,7 @@
             <div class="messages-container" id="messagesContainer">
                 <div class="empty-state" id="emptyState">
                     <div class="empty-emoji">💬</div>
-                    <p>Выберите диалог</p>
-                    <span style="font-size: 0.8rem; opacity: 0.6;">Нажмите ← чтобы открыть список</span>
+                    <p>Выберите диалог из списка</p>
                 </div>
             </div>
             <div id="typingIndicatorContainer" class="typing-indicator hidden">
