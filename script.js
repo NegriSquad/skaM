@@ -27,17 +27,16 @@ const state = {
     searchTimer: null,
     selectedAvatarDataUrl: null,
     isAtBottom: true,
-    // Voice recording
     mediaRecorder: null,
     audioChunks: [],
     isRecording: false,
     recordingStartTime: null,
-    // Call state
     currentCall: null,
     peerConnection: null,
     localStream: null,
     callType: null,
-    callListener: null
+    callListener: null,
+    selectedVideoFile: null
 };
 
 const els = {};
@@ -107,7 +106,6 @@ function bindEvents() {
     els.scrollBottomBtn.addEventListener("click", () => scrollMessagesToBottom(true));
     els.backToDialogsBtn.addEventListener("click", () => els.chatArea.classList.remove("open"));
     
-    // Call buttons
     if (els.voiceCallBtn) els.voiceCallBtn.addEventListener("click", () => startCall('audio'));
     if (els.videoCallBtn) els.videoCallBtn.addEventListener("click", () => startCall('video'));
     if (els.endCallBtn) els.endCallBtn.addEventListener("click", endCall);
@@ -115,7 +113,6 @@ function bindEvents() {
     if (els.toggleMicBtn) els.toggleMicBtn.addEventListener("click", toggleMicrophone);
     if (els.toggleVideoBtn) els.toggleVideoBtn.addEventListener("click", toggleVideo);
     
-    // Media buttons
     if (els.attachBtn) els.attachBtn.addEventListener("click", openVideoUpload);
     if (els.voiceRecordBtn) els.voiceRecordBtn.addEventListener("click", toggleVoiceRecording);
     if (els.sendVideoBtn) els.sendVideoBtn.addEventListener("click", sendVideoMessage);
@@ -258,4 +255,766 @@ async function loginUser() {
 }
 
 async function logout() {
-    await
+    await clearTypingIndicator();
+    await auth.signOut();
+}
+
+function renderCurrentProfile() {
+    const profile = state.profile || {};
+    setAvatar(els.sidebarAvatar, profile.nickname || profile.username, profile.avatarUrl);
+    els.sidebarName.textContent = profile.nickname || "Профиль";
+    els.sidebarUsername.textContent = `@${profile.username || "username"}`;
+}
+
+function openProfileModal() {
+    const profile = state.profile || {};
+    els.profileNickname.value = profile.nickname || "";
+    els.profileUsername.value = profile.username || "";
+    els.profileAvatarFile.value = "";
+    state.selectedAvatarDataUrl = profile.avatarUrl || "";
+    els.profileBio.value = profile.bio || "";
+    updateProfilePreview();
+    els.profileModal.classList.remove("hidden");
+}
+
+function closeProfileModal() {
+    els.profileModal.classList.add("hidden");
+}
+
+async function saveProfile() {
+    const nickname = els.profileNickname.value.trim();
+    const username = normalizeUsername(els.profileUsername.value);
+    const avatarUrl = state.selectedAvatarDataUrl || "";
+    const bio = els.profileBio.value.trim();
+
+    if (!nickname || !username) {
+        alert("Имя и username обязательны.");
+        return;
+    }
+    if (!isValidUsername(username)) {
+        alert("Username может содержать только латиницу, цифры и нижнее подчеркивание.");
+        return;
+    }
+    try {
+        const oldUsername = state.profile.username;
+        const foundUid = await findUidByUsername(username);
+        if (foundUid && foundUid !== state.user.uid) {
+            alert("Этот username уже занят.");
+            return;
+        }
+
+        const updates = { nickname, username, avatarUrl, bio, updatedAt: Date.now() };
+        await db.ref(`users/${state.user.uid}`).update(updates);
+
+        if (username !== oldUsername) {
+            await removeUsernameIndex(oldUsername, state.user.uid);
+            await setUsernameIndex(username, state.user.uid);
+        }
+
+        state.profile = { ...state.profile, ...updates };
+        renderCurrentProfile();
+        await refreshOwnDialogCards();
+        closeProfileModal();
+    } catch (error) {
+        alert(`Не удалось сохранить профиль: ${error.message}`);
+    }
+}
+
+function updateProfilePreview() {
+    const nickname = els.profileNickname.value.trim() || "Имя";
+    const username = normalizeUsername(els.profileUsername.value) || "username";
+    setAvatar(els.profileAvatarPreview, nickname, state.selectedAvatarDataUrl);
+    els.profilePreviewName.textContent = nickname;
+    els.profilePreviewUsername.textContent = `@${username}`;
+}
+
+async function handleAvatarFileSelect(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+        alert("Выберите файл изображения.");
+        els.profileAvatarFile.value = "";
+        return;
+    }
+
+    try {
+        state.selectedAvatarDataUrl = await compressAvatar(file);
+        updateProfilePreview();
+    } catch (error) {
+        alert(`Не удалось обработать аватарку: ${error.message}`);
+        els.profileAvatarFile.value = "";
+    }
+}
+
+function removeSelectedAvatar() {
+    state.selectedAvatarDataUrl = "";
+    els.profileAvatarFile.value = "";
+    updateProfilePreview();
+}
+
+["profileNickname", "profileUsername"].forEach(id => {
+    document.addEventListener("input", event => {
+        if (event.target && event.target.id === id) updateProfilePreview();
+    });
+});
+
+function listenDialogs() {
+    if (state.dialogsListener) state.dialogsListener.ref.off("value", state.dialogsListener.callback);
+
+    const ref = db.ref(`user_chats/${state.user.uid}`);
+    const callback = snap => renderDialogs(snap.val() || {});
+    ref.on("value", callback);
+    state.dialogsListener = { ref, callback };
+}
+
+function renderDialogs(chats) {
+    const entries = Object.entries(chats).sort((a, b) => (b[1].lastTimestamp || 0) - (a[1].lastTimestamp || 0));
+    els.dialogsList.replaceChildren();
+    els.dialogsCount.textContent = entries.length;
+
+    if (!entries.length) {
+        els.dialogsList.appendChild(emptyBlock("Диалогов пока нет", "Найдите человека по username и начните переписку."));
+        return;
+    }
+
+    entries.forEach(([chatId, info]) => {
+        const item = document.createElement("button");
+        item.className = `dialog-item ${chatId === state.activeChatId ? "active" : ""}`;
+        item.type = "button";
+        item.addEventListener("click", () => openChat(chatId, {
+            uid: info.partnerId,
+            nickname: info.partnerName || info.partnerUsername,
+            username: info.partnerUsername,
+            avatarUrl: info.partnerAvatarUrl || "",
+            bio: info.partnerBio || ""
+        }));
+
+        const avatar = document.createElement("span");
+        avatar.className = "avatar";
+        setAvatar(avatar, info.partnerName || info.partnerUsername, info.partnerAvatarUrl);
+
+        const content = document.createElement("span");
+        content.className = "dialog-content";
+
+        const name = document.createElement("strong");
+        name.textContent = info.partnerName || `@${info.partnerUsername}`;
+
+        const last = document.createElement("small");
+        last.textContent = info.lastMessage || "Диалог создан";
+
+        const meta = document.createElement("time");
+        meta.textContent = info.lastTimestamp ? formatShortTime(info.lastTimestamp) : "";
+
+        content.append(name, last);
+        item.append(avatar, content, meta);
+        els.dialogsList.appendChild(item);
+    });
+}
+
+async function searchUserByUsername(rawUsername) {
+    const username = normalizeUsername(rawUsername);
+    els.searchResults.classList.remove("hidden");
+    els.searchResults.replaceChildren();
+
+    if (!username) {
+        els.searchResults.appendChild(searchMessage("Введите username для поиска."));
+        return;
+    }
+
+    try {
+        const uid = await findUidByUsername(username);
+        if (!uid || uid === state.user.uid) {
+            els.searchResults.appendChild(searchMessage("Пользователь не найден."));
+            return;
+        }
+
+        const userData = (await db.ref(`users/${uid}`).once("value")).val();
+        if (!userData) {
+            els.searchResults.appendChild(searchMessage("Профиль пользователя недоступен."));
+            return;
+        }
+
+        const item = document.createElement("div");
+        item.className = "search-result-item";
+
+        const avatar = document.createElement("span");
+        avatar.className = "avatar";
+        setAvatar(avatar, userData.nickname || userData.username, userData.avatarUrl);
+
+        const text = document.createElement("span");
+        text.className = "search-result-text";
+        text.innerHTML = `<strong></strong><small></small>`;
+        text.querySelector("strong").textContent = userData.nickname;
+        text.querySelector("small").textContent = `@${userData.username}`;
+
+        const button = document.createElement("button");
+        button.className = "small-btn";
+        button.textContent = "Написать";
+        button.addEventListener("click", () => startDialogWith(uid, userData));
+
+        item.append(avatar, text, button);
+        els.searchResults.appendChild(item);
+    } catch (error) {
+        els.searchResults.appendChild(searchMessage(`Ошибка поиска: ${error.message}`));
+    }
+}
+
+async function startDialogWith(uid, userData) {
+    const chatId = [state.user.uid, uid].sort().join("_");
+    const now = Date.now();
+    const ownRef = db.ref(`user_chats/${state.user.uid}/${chatId}`);
+    const exists = (await ownRef.once("value")).exists();
+
+    if (!exists) {
+        await ownRef.set({
+            partnerId: uid,
+            partnerName: userData.nickname,
+            partnerUsername: userData.username,
+            partnerAvatarUrl: userData.avatarUrl || "",
+            partnerBio: userData.bio || "",
+            lastMessage: "",
+            lastTimestamp: now
+        });
+        await db.ref(`user_chats/${uid}/${chatId}`).set({
+            partnerId: state.user.uid,
+            partnerName: state.profile.nickname,
+            partnerUsername: state.profile.username,
+            partnerAvatarUrl: state.profile.avatarUrl || "",
+            partnerBio: state.profile.bio || "",
+            lastMessage: "",
+            lastTimestamp: now
+        });
+    }
+
+    els.searchUserInput.value = "";
+    els.searchResults.classList.add("hidden");
+    openChat(chatId, { uid, nickname: userData.nickname, username: userData.username, avatarUrl: userData.avatarUrl || "", bio: userData.bio || "" });
+}
+
+function openChat(chatId, partner) {
+    state.activeChatId = chatId;
+    state.activePartner = partner;
+    state.editingMessageId = null;
+    cancelEditMessage();
+
+    els.currentChatTitle.textContent = partner.nickname || `@${partner.username}`;
+    els.currentChatSubtitle.textContent = partner.bio || `@${partner.username}`;
+    setAvatar(els.chatAvatar, partner.nickname || partner.username, partner.avatarUrl);
+    els.chatAvatar.classList.remove("muted");
+    els.deleteDialogBtn.classList.remove("hidden");
+    els.messageInput.disabled = false;
+    els.sendBtn.disabled = false;
+    
+    if (els.voiceCallBtn) els.voiceCallBtn.disabled = false;
+    if (els.videoCallBtn) els.videoCallBtn.disabled = false;
+
+    renderLoadingMessages();
+    listenMessages(chatId);
+    listenTyping(chatId);
+
+    if (window.innerWidth <= 768) els.chatArea.classList.add("open");
+}
+
+function listenMessages(chatId) {
+    if (state.messagesListener) state.messagesListener.ref.off("value", state.messagesListener.callback);
+
+    const ref = db.ref(`private_messages/${chatId}`).orderByChild("timestamp").limitToLast(100);
+    const callback = snap => {
+        const data = snap.val() || {};
+        const messages = Object.entries(data)
+            .map(([id, message]) => ({ id, ...message }))
+            .filter(message => !message.deletedFor || !message.deletedFor[state.user.uid])
+            .sort((a, b) => a.timestamp - b.timestamp);
+        renderMessages(messages);
+    };
+
+    ref.on("value", callback);
+    state.messagesListener = { ref, callback };
+}
+
+function renderMessages(messages) {
+    const wasAtBottom = state.isAtBottom;
+
+    if (!messages.length) {
+        els.messagesContainer.replaceChildren(emptyBlock("Сообщений пока нет", "Напишите первым и начните диалог."));
+        return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    let lastDate = "";
+    messages.forEach(message => {
+        const date = formatDateGroup(message.timestamp);
+        if (date !== lastDate) {
+            const divider = document.createElement("div");
+            divider.className = "date-divider";
+            divider.textContent = date;
+            fragment.appendChild(divider);
+            lastDate = date;
+        }
+
+        fragment.appendChild(createMessageNode(message));
+    });
+
+    els.messagesContainer.replaceChildren(fragment);
+    if (wasAtBottom) scrollMessagesToBottom(false);
+    requestAnimationFrame(updateScrollState);
+}
+
+function createMessageNode(message) {
+    const isOwn = message.senderId === state.user.uid;
+    const item = document.createElement("article");
+    item.className = `message-item ${isOwn ? "own-message" : ""}`;
+
+    const bubble = document.createElement("div");
+    bubble.className = "message-bubble";
+
+    let content;
+    
+    if (message.type === 'video' && message.videoUrl) {
+        content = document.createElement("div");
+        content.className = "message-video";
+        const video = document.createElement("video");
+        video.src = message.videoUrl;
+        video.controls = true;
+        video.preload = "metadata";
+        video.style.maxWidth = "250px";
+        video.style.borderRadius = "8px";
+        content.appendChild(video);
+    } else if (message.type === 'voice' && message.voiceUrl) {
+        content = document.createElement("div");
+        content.className = "message-voice";
+        const playBtn = document.createElement("button");
+        playBtn.className = "voice-play-btn";
+        playBtn.innerHTML = "▶";
+        playBtn.onclick = () => {
+            const audio = new Audio(message.voiceUrl);
+            audio.play();
+        };
+        const wave = document.createElement("div");
+        wave.className = "voice-wave";
+        for (let i = 0; i < 5; i++) wave.appendChild(document.createElement("span"));
+        const duration = document.createElement("span");
+        duration.className = "voice-duration";
+        duration.textContent = message.duration || "0:00";
+        content.append(playBtn, wave, duration);
+    } else {
+        const text = document.createElement("p");
+        text.className = "message-text";
+        text.textContent = message.deleted ? "Сообщение удалено" : message.text;
+        if (message.deleted) text.classList.add("muted-text");
+        content = text;
+    }
+
+    const meta = document.createElement("div");
+    meta.className = "message-meta";
+
+    const time = document.createElement("time");
+    time.textContent = `${formatShortTime(message.timestamp)}${message.editedAt ? " · изменено" : ""}`;
+    meta.appendChild(time);
+
+    if (isOwn && !message.deleted && !message.type) {
+        const actions = document.createElement("span");
+        actions.className = "message-actions";
+
+        const editBtn = messageAction("Изменить", "edit");
+        editBtn.addEventListener("click", () => beginEditMessage(message));
+
+        const deleteBtn = messageAction("Удалить", "delete");
+        deleteBtn.addEventListener("click", () => deleteMessage(message.id));
+
+        actions.append(editBtn, deleteBtn);
+        meta.appendChild(actions);
+    }
+
+    bubble.append(content, meta);
+    item.appendChild(bubble);
+    return item;
+}
+
+async function sendOrUpdateMessage() {
+    if (!state.activeChatId || !state.activePartner) return;
+    const text = els.messageInput.value.trim();
+    if (!text) return;
+
+    try {
+        if (state.editingMessageId) {
+            await db.ref(`private_messages/${state.activeChatId}/${state.editingMessageId}`).update({
+                text,
+                editedAt: Date.now()
+            });
+            await updateChatLastMessage(text);
+            cancelEditMessage();
+            scrollMessagesToBottom(true);
+            return;
+        }
+
+        await db.ref(`private_messages/${state.activeChatId}`).push({
+            senderId: state.user.uid,
+            text,
+            timestamp: Date.now(),
+            editedAt: null,
+            deleted: false
+        });
+        await updateChatLastMessage(text);
+        els.messageInput.value = "";
+        updateCharCounter();
+        await clearTypingIndicator();
+        scrollMessagesToBottom(true);
+    } catch (error) {
+        alert(`Не удалось отправить сообщение: ${error.message}`);
+    }
+}
+
+async function updateChatLastMessage(text, timestamp = Date.now()) {
+    await db.ref(`user_chats/${state.user.uid}/${state.activeChatId}`).update({
+        lastMessage: text,
+        lastTimestamp: timestamp,
+        partnerId: state.activePartner.uid,
+        partnerName: state.activePartner.nickname,
+        partnerUsername: state.activePartner.username,
+        partnerAvatarUrl: state.activePartner.avatarUrl || "",
+        partnerBio: state.activePartner.bio || ""
+    });
+    await db.ref(`user_chats/${state.activePartner.uid}/${state.activeChatId}`).update({
+        lastMessage: text,
+        lastTimestamp: timestamp,
+        partnerId: state.user.uid,
+        partnerName: state.profile.nickname,
+        partnerUsername: state.profile.username,
+        partnerAvatarUrl: state.profile.avatarUrl || "",
+        partnerBio: state.profile.bio || ""
+    });
+}
+
+function beginEditMessage(message) {
+    state.editingMessageId = message.id;
+    els.messageInput.value = message.text;
+    els.messageInput.focus();
+    els.editBanner.classList.remove("hidden");
+    updateCharCounter();
+}
+
+function cancelEditMessage() {
+    state.editingMessageId = null;
+    els.editBanner.classList.add("hidden");
+    if (els.messageInput) {
+        els.messageInput.value = "";
+        updateCharCounter();
+    }
+}
+
+async function deleteMessage(messageId) {
+    if (!confirm("Удалить сообщение?")) return;
+    await db.ref(`private_messages/${state.activeChatId}/${messageId}`).update({
+        deleted: true,
+        text: "",
+        deletedAt: Date.now()
+    });
+    await syncLastMessageAfterDelete();
+}
+
+async function syncLastMessageAfterDelete() {
+    if (!state.activeChatId || !state.activePartner) return;
+    const snap = await db.ref(`private_messages/${state.activeChatId}`).orderByChild("timestamp").limitToLast(30).once("value");
+    const messages = Object.values(snap.val() || {})
+        .filter(message => !message.deleted)
+        .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    const latest = messages[0];
+    await updateChatLastMessage(latest ? latest.text : "Сообщений нет", latest ? latest.timestamp : Date.now());
+}
+
+async function deleteCurrentDialog() {
+    if (!state.activeChatId || !confirm("Удалить диалог из списка? Сообщения у собеседника останутся.")) return;
+    await db.ref(`user_chats/${state.user.uid}/${state.activeChatId}`).remove();
+    renderEmptyChat();
+}
+
+function renderEmptyChat() {
+    state.activeChatId = null;
+    state.activePartner = null;
+    els.currentChatTitle.textContent = "Выберите диалог";
+    els.currentChatSubtitle.textContent = "Сообщения появятся здесь";
+    els.chatAvatar.textContent = "sM";
+    els.chatAvatar.style.backgroundImage = "";
+    els.chatAvatar.classList.add("muted");
+    els.deleteDialogBtn.classList.add("hidden");
+    els.messageInput.disabled = true;
+    els.sendBtn.disabled = true;
+    
+    if (els.voiceCallBtn) els.voiceCallBtn.disabled = true;
+    if (els.videoCallBtn) els.videoCallBtn.disabled = true;
+    
+    els.messagesContainer.replaceChildren(emptyBlock("Добро пожаловать", "Найдите пользователя по username или откройте существующий диалог."));
+    updateScrollState();
+    if (state.messagesListener) state.messagesListener.ref.off("value", state.messagesListener.callback);
+    if (state.typingListener) state.typingListener.ref.off("value", state.typingListener.callback);
+}
+
+function renderLoadingMessages() {
+    els.messagesContainer.replaceChildren(emptyBlock("Загрузка", "Получаем историю сообщений."));
+}
+
+function listenTyping(chatId) {
+    if (state.typingListener) state.typingListener.ref.off("value", state.typingListener.callback);
+
+    const ref = db.ref(`typing/${chatId}`);
+    const callback = snap => {
+        const data = snap.val() || {};
+        const typingUsers = Object.entries(data).filter(([uid]) => uid !== state.user.uid);
+        els.typingIndicatorContainer.classList.toggle("hidden", typingUsers.length === 0);
+        if (typingUsers.length) {
+            els.typingText.textContent = `${typingUsers[0][1].name || "Собеседник"} печатает...`;
+        }
+    };
+    ref.on("value", callback);
+    state.typingListener = { ref, callback };
+}
+
+function updateTyping(isTyping) {
+    if (!state.activeChatId || !state.user || state.editingMessageId) return;
+    const ref = db.ref(`typing/${state.activeChatId}/${state.user.uid}`);
+    if (isTyping) {
+        ref.set({ name: state.profile.nickname, timestamp: Date.now() });
+    } else {
+        ref.remove();
+    }
+}
+
+function clearTypingIndicator() {
+    if (!state.activeChatId || !state.user) return Promise.resolve();
+    return db.ref(`typing/${state.activeChatId}/${state.user.uid}`).remove();
+}
+
+async function refreshOwnDialogCards() {
+    const snap = await db.ref(`user_chats/${state.user.uid}`).once("value");
+    const chats = snap.val() || {};
+    const updates = {};
+
+    Object.entries(chats).forEach(([chatId, info]) => {
+        if (!info.partnerId) return;
+        updates[`user_chats/${info.partnerId}/${chatId}/partnerName`] = state.profile.nickname;
+        updates[`user_chats/${info.partnerId}/${chatId}/partnerUsername`] = state.profile.username;
+        updates[`user_chats/${info.partnerId}/${chatId}/partnerAvatarUrl`] = state.profile.avatarUrl || "";
+        updates[`user_chats/${info.partnerId}/${chatId}/partnerBio`] = state.profile.bio || "";
+    });
+
+    if (Object.keys(updates).length) await db.ref().update(updates);
+}
+
+async function findUidByUsername(username) {
+    const clean = normalizeUsername(username);
+    const direct = (await db.ref(`usernames/${clean}`).once("value")).val();
+    if (typeof direct === "string") return direct;
+
+    const legacyMap = (await db.ref("usernames").once("value")).val() || {};
+    for (const [key, value] of Object.entries(legacyMap)) {
+        if (value === clean) return key;
+    }
+    return null;
+}
+
+async function setUsernameIndex(username, uid) {
+    await db.ref(`usernames/${username}`).set(uid);
+}
+
+async function removeUsernameIndex(username, uid) {
+    if (!username) return;
+    const current = await db.ref(`usernames/${username}`).once("value");
+    if (current.val() === uid) await db.ref(`usernames/${username}`).remove();
+    const legacy = await db.ref(`usernames/${uid}`).once("value");
+    if (legacy.val() === username) await db.ref(`usernames/${uid}`).remove();
+}
+
+function initTheme() {
+    const saved = localStorage.getItem("skam-theme");
+    const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    applyTheme(saved || (prefersDark ? "dark" : "light"));
+}
+
+function toggleTheme() {
+    const nextTheme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    applyTheme(nextTheme);
+    localStorage.setItem("skam-theme", nextTheme);
+}
+
+function applyTheme(theme) {
+    document.documentElement.dataset.theme = theme;
+    if (els.themeToggleBtn) els.themeToggleBtn.classList.toggle("active", theme === "dark");
+}
+
+function setAvatar(element, label, avatarUrl) {
+    if (!element) return;
+    
+    element.textContent = "";
+    element.style.backgroundImage = "";
+    element.classList.remove("has-image");
+
+    if (avatarUrl && (/^https?:\/\//i.test(avatarUrl) || /^data:image\//i.test(avatarUrl))) {
+        const image = document.createElement("img");
+        image.src = avatarUrl;
+        image.alt = label || "avatar";
+        image.loading = "lazy";
+        image.referrerPolicy = "no-referrer";
+        image.addEventListener("error", () => {
+            element.classList.remove("has-image");
+            element.replaceChildren(document.createTextNode(getInitials(label)));
+        }, { once: true });
+        element.classList.add("has-image");
+        element.appendChild(image);
+        return;
+    }
+
+    element.textContent = getInitials(label);
+}
+
+function compressAvatar(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("не удалось прочитать файл"));
+        reader.onload = () => {
+            const image = new Image();
+            image.onerror = () => reject(new Error("файл не похож на картинку"));
+            image.onload = () => {
+                const size = 256;
+                const canvas = document.createElement("canvas");
+                const context = canvas.getContext("2d");
+                const sourceSize = Math.min(image.width, image.height);
+                const sourceX = Math.floor((image.width - sourceSize) / 2);
+                const sourceY = Math.floor((image.height - sourceSize) / 2);
+
+                canvas.width = size;
+                canvas.height = size;
+                context.imageSmoothingQuality = "high";
+                context.drawImage(image, sourceX, sourceY, sourceSize, sourceSize, 0, 0, size, size);
+                resolve(canvas.toDataURL("image/jpeg", 0.78));
+            };
+            image.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+function scrollMessagesToBottom(smooth) {
+    requestAnimationFrame(() => {
+        if (!els.messagesContainer) return;
+        els.messagesContainer.scrollTo({
+            top: els.messagesContainer.scrollHeight,
+            behavior: smooth ? "smooth" : "auto"
+        });
+        state.isAtBottom = true;
+        setTimeout(updateScrollState, smooth ? 200 : 0);
+    });
+}
+
+function updateScrollState() {
+    if (!state.activeChatId) {
+        if (els.scrollBottomBtn) els.scrollBottomBtn.classList.add("hidden");
+        return;
+    }
+
+    if (!els.messagesContainer) return;
+    
+    const { scrollTop, scrollHeight, clientHeight } = els.messagesContainer;
+    const hasOverflow = scrollHeight > clientHeight + 24;
+    const isBottom = scrollHeight - scrollTop - clientHeight < 96;
+    state.isAtBottom = isBottom;
+    
+    if (els.scrollBottomBtn) {
+        els.scrollBottomBtn.classList.toggle("hidden", !hasOverflow || isBottom);
+    }
+}
+
+function normalizeUsername(value) {
+    return String(value || "").trim().replace(/^@/, "").toLowerCase();
+}
+
+function isValidUsername(username) {
+    return /^[a-z0-9_]{3,24}$/.test(username);
+}
+
+function updateCharCounter() {
+    if (els.charCounter && els.messageInput) {
+        els.charCounter.textContent = `${els.messageInput.value.length}/500`;
+    }
+}
+
+function getInitials(value) {
+    const clean = String(value || "sM").trim();
+    const parts = clean.split(/\s+/).filter(Boolean);
+    if (parts.length > 1) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    return clean.slice(0, 2).toUpperCase();
+}
+
+function formatShortTime(timestamp) {
+    return new Date(timestamp).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatDateGroup(timestamp) {
+    const date = new Date(timestamp);
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+    if (date.toDateString() === today.toDateString()) return "Сегодня";
+    if (date.toDateString() === yesterday.toDateString()) return "Вчера";
+    return date.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+}
+
+function emptyBlock(title, text) {
+    const block = document.createElement("div");
+    block.className = "empty-state";
+    const logo = document.createElement("div");
+    logo.className = "empty-logo";
+    logo.textContent = "sM";
+    const heading = document.createElement("h2");
+    heading.textContent = title;
+    const paragraph = document.createElement("p");
+    paragraph.textContent = text;
+    block.append(logo, heading, paragraph);
+    return block;
+}
+
+function searchMessage(text) {
+    const item = document.createElement("div");
+    item.className = "search-result-item muted-result";
+    item.textContent = text;
+    return item;
+}
+
+function messageAction(label, type) {
+    const button = document.createElement("button");
+    button.className = `message-action ${type}`;
+    button.type = "button";
+    button.textContent = label;
+    return button;
+}
+
+// ========== VOICE RECORDING FUNCTIONS ==========
+
+async function toggleVoiceRecording() {
+    if (state.isRecording) {
+        stopVoiceRecording();
+    } else {
+        startVoiceRecording();
+    }
+}
+
+async function startVoiceRecording() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        state.mediaRecorder = new MediaRecorder(stream);
+        state.audioChunks = [];
+        
+        state.mediaRecorder.ondataavailable = (event) => {
+            state.audioChunks.push(event.data);
+        };
+        
+        state.mediaRecorder.onstop = async () => {
+            const audioBlob = new Blob(state.audioChunks, { type: 'audio/webm' });
+            await sendVoiceMessage(audioBlob);
+            stream.getTracks().forEach(track => track.stop());
+        };
+        
+        state.mediaRecorder.start();
+        state.isRecording = true;
+        state.recordingStartTime
