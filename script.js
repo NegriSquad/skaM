@@ -31,6 +31,7 @@ const state = {
 const els = {};
 
 document.addEventListener("DOMContentLoaded", () => {
+    console.log("DOM загружен");
     bindElements();
     bindEvents();
     updateCharCounter();
@@ -39,7 +40,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function bindElements() {
-    [
+    const ids = [
         "loginScreen", "registerScreen", "mainAppScreen", "loginEmail", "loginPassword",
         "doLoginBtn", "showRegisterBtn", "regEmail", "regUsername", "regNickname",
         "regPassword", "doRegisterBtn", "showLoginFromRegBtn", "globalLogoutBtn",
@@ -51,63 +52,85 @@ function bindElements() {
         "cancelEditBtn", "profileModal", "closeProfileBtn", "profileAvatarPreview",
         "profilePreviewName", "profilePreviewUsername", "profileNickname",
         "profileUsername", "profileAvatarFile", "removeAvatarBtn", "profileBio", "saveProfileBtn"
-    ].forEach(id => els[id] = document.getElementById(id));
+    ];
+    
+    ids.forEach(id => {
+        els[id] = document.getElementById(id);
+        if (!els[id] && id !== "scrollBottomBtn") {
+            console.warn(`Элемент ${id} не найден`);
+        }
+    });
+    
+    // Проверка важных элементов
+    console.log("messageInput найден:", !!els.messageInput);
+    console.log("messagesContainer найден:", !!els.messagesContainer);
+    console.log("sendBtn найден:", !!els.sendBtn);
 }
 
 function bindEvents() {
     initTheme();
-    els.doLoginBtn.addEventListener("click", loginUser);
-    els.doRegisterBtn.addEventListener("click", registerUser);
-    els.showRegisterBtn.addEventListener("click", () => showAuthScreen("register"));
-    els.showLoginFromRegBtn.addEventListener("click", () => showAuthScreen("login"));
-    els.globalLogoutBtn.addEventListener("click", logout);
-    els.openProfileBtn.addEventListener("click", openProfileModal);
-    els.themeToggleBtn.addEventListener("click", toggleTheme);
-    els.closeProfileBtn.addEventListener("click", closeProfileModal);
-    els.saveProfileBtn.addEventListener("click", saveProfile);
-    els.profileAvatarFile.addEventListener("change", handleAvatarFileSelect);
-    els.removeAvatarBtn.addEventListener("click", removeSelectedAvatar);
-    els.profileModal.addEventListener("click", event => {
+    
+    if (els.doLoginBtn) els.doLoginBtn.addEventListener("click", loginUser);
+    if (els.doRegisterBtn) els.doRegisterBtn.addEventListener("click", registerUser);
+    if (els.showRegisterBtn) els.showRegisterBtn.addEventListener("click", () => showAuthScreen("register"));
+    if (els.showLoginFromRegBtn) els.showLoginFromRegBtn.addEventListener("click", () => showAuthScreen("login"));
+    if (els.globalLogoutBtn) els.globalLogoutBtn.addEventListener("click", logout);
+    if (els.openProfileBtn) els.openProfileBtn.addEventListener("click", openProfileModal);
+    if (els.themeToggleBtn) els.themeToggleBtn.addEventListener("click", toggleTheme);
+    if (els.closeProfileBtn) els.closeProfileBtn.addEventListener("click", closeProfileModal);
+    if (els.saveProfileBtn) els.saveProfileBtn.addEventListener("click", saveProfile);
+    if (els.profileAvatarFile) els.profileAvatarFile.addEventListener("change", handleAvatarFileSelect);
+    if (els.removeAvatarBtn) els.removeAvatarBtn.addEventListener("click", removeSelectedAvatar);
+    if (els.profileModal) els.profileModal.addEventListener("click", event => {
         if (event.target === els.profileModal) closeProfileModal();
     });
 
-    els.searchUserBtn.addEventListener("click", () => searchUserByUsername(els.searchUserInput.value));
-    els.searchUserInput.addEventListener("keydown", event => {
-        if (event.key === "Enter") searchUserByUsername(els.searchUserInput.value);
-    });
-    els.searchUserInput.addEventListener("input", () => {
-        clearTimeout(state.searchTimer);
-        state.searchTimer = setTimeout(() => {
-            if (els.searchUserInput.value.trim().length >= 3) searchUserByUsername(els.searchUserInput.value);
-        }, 350);
-    });
+    if (els.searchUserBtn) els.searchUserBtn.addEventListener("click", () => searchUserByUsername(els.searchUserInput.value));
+    if (els.searchUserInput) {
+        els.searchUserInput.addEventListener("keydown", event => {
+            if (event.key === "Enter") searchUserByUsername(els.searchUserInput.value);
+        });
+        els.searchUserInput.addEventListener("input", () => {
+            clearTimeout(state.searchTimer);
+            state.searchTimer = setTimeout(() => {
+                if (els.searchUserInput.value.trim().length >= 3) searchUserByUsername(els.searchUserInput.value);
+            }, 350);
+        });
+    }
 
-    els.sendBtn.addEventListener("click", sendOrUpdateMessage);
-    els.cancelEditBtn.addEventListener("click", cancelEditMessage);
-    els.deleteDialogBtn.addEventListener("click", deleteCurrentDialog);
-    els.scrollBottomBtn.addEventListener("click", () => scrollMessagesToBottom(true));
-    els.backToDialogsBtn.addEventListener("click", () => els.chatArea.classList.remove("open"));
+    if (els.sendBtn) els.sendBtn.addEventListener("click", sendOrUpdateMessage);
+    if (els.cancelEditBtn) els.cancelEditBtn.addEventListener("click", cancelEditMessage);
+    if (els.deleteDialogBtn) els.deleteDialogBtn.addEventListener("click", deleteCurrentDialog);
+    if (els.scrollBottomBtn) els.scrollBottomBtn.addEventListener("click", () => scrollMessagesToBottom(true));
+    if (els.backToDialogsBtn) els.backToDialogsBtn.addEventListener("click", () => els.chatArea.classList.remove("open"));
 
-    els.messageInput.addEventListener("input", () => {
-        updateCharCounter();
-        updateTyping(true);
-        clearTimeout(state.typingTimer);
-        state.typingTimer = setTimeout(() => updateTyping(false), 1200);
-    });
-    els.messageInput.addEventListener("keydown", event => {
-        if (event.key === "Enter" && !event.shiftKey) {
-            event.preventDefault();
-            sendOrUpdateMessage();
-        }
-    });
-    els.messageInput.addEventListener("blur", () => updateTyping(false));
+    if (els.messageInput) {
+        els.messageInput.addEventListener("input", () => {
+            updateCharCounter();
+            updateTyping(true);
+            clearTimeout(state.typingTimer);
+            state.typingTimer = setTimeout(() => updateTyping(false), 1200);
+        });
+        els.messageInput.addEventListener("keydown", event => {
+            if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                sendOrUpdateMessage();
+            }
+        });
+        els.messageInput.addEventListener("blur", () => updateTyping(false));
+    }
 }
 
 function initScrollHandler() {
     if (els.messagesContainer) {
+        console.log("Инициализация обработчика скролла");
         els.messagesContainer.addEventListener("scroll", () => {
             updateScrollState();
         });
+        // Первоначальная проверка
+        updateScrollState();
+    } else {
+        console.error("messagesContainer не найден для обработчика скролла");
     }
 }
 
@@ -132,15 +155,15 @@ async function handleAuthState(user) {
 }
 
 function showAuthScreen(screen) {
-    els.loginScreen.classList.toggle("hidden", screen !== "login");
-    els.registerScreen.classList.toggle("hidden", screen !== "register");
-    els.mainAppScreen.classList.add("hidden");
+    if (els.loginScreen) els.loginScreen.classList.toggle("hidden", screen !== "login");
+    if (els.registerScreen) els.registerScreen.classList.toggle("hidden", screen !== "register");
+    if (els.mainAppScreen) els.mainAppScreen.classList.add("hidden");
 }
 
 function showMainApp() {
-    els.loginScreen.classList.add("hidden");
-    els.registerScreen.classList.add("hidden");
-    els.mainAppScreen.classList.remove("hidden");
+    if (els.loginScreen) els.loginScreen.classList.add("hidden");
+    if (els.registerScreen) els.registerScreen.classList.add("hidden");
+    if (els.mainAppScreen) els.mainAppScreen.classList.remove("hidden");
     renderCurrentProfile();
     renderEmptyChat();
     listenDialogs();
@@ -154,7 +177,7 @@ function resetSession() {
     state.activePartner = null;
     state.editingMessageId = null;
     state.selectedAvatarDataUrl = null;
-    els.mainAppScreen.classList.add("hidden");
+    if (els.mainAppScreen) els.mainAppScreen.classList.add("hidden");
 }
 
 function detachListeners() {
@@ -464,8 +487,12 @@ function openChat(chatId, partner) {
     setAvatar(els.chatAvatar, partner.nickname || partner.username, partner.avatarUrl);
     els.chatAvatar.classList.remove("muted");
     els.deleteDialogBtn.classList.remove("hidden");
-    els.messageInput.disabled = false;
-    els.sendBtn.disabled = false;
+    
+    if (els.messageInput) {
+        els.messageInput.disabled = false;
+        els.messageInput.focus();
+    }
+    if (els.sendBtn) els.sendBtn.disabled = false;
 
     renderLoadingMessages();
     listenMessages(chatId);
@@ -494,8 +521,13 @@ function listenMessages(chatId) {
 function renderMessages(messages) {
     const wasAtBottom = state.isAtBottom;
 
+    if (!els.messagesContainer) return;
+
     if (!messages.length) {
         els.messagesContainer.replaceChildren(emptyBlock("Сообщений пока нет", "Напишите первым и начните диалог."));
+        if (els.messagesContainer) {
+            updateScrollState();
+        }
         return;
     }
 
@@ -516,7 +548,7 @@ function renderMessages(messages) {
 
     els.messagesContainer.replaceChildren(fragment);
     if (wasAtBottom) scrollMessagesToBottom(false);
-    requestAnimationFrame(updateScrollState);
+    setTimeout(() => updateScrollState(), 100);
 }
 
 function createMessageNode(message) {
@@ -559,7 +591,15 @@ function createMessageNode(message) {
 }
 
 async function sendOrUpdateMessage() {
-    if (!state.activeChatId || !state.activePartner) return;
+    if (!state.activeChatId || !state.activePartner) {
+        console.warn("Нет активного чата");
+        return;
+    }
+    if (!els.messageInput) {
+        console.error("messageInput не найден");
+        return;
+    }
+    
     const text = els.messageInput.value.trim();
     if (!text) return;
 
@@ -665,16 +705,26 @@ function renderEmptyChat() {
     els.chatAvatar.style.backgroundImage = "";
     els.chatAvatar.classList.add("muted");
     els.deleteDialogBtn.classList.add("hidden");
-    els.messageInput.disabled = true;
-    els.sendBtn.disabled = true;
-    els.messagesContainer.replaceChildren(emptyBlock("Добро пожаловать", "Найдите пользователя по username или откройте существующий диалог."));
+    
+    if (els.messageInput) {
+        els.messageInput.disabled = true;
+        els.messageInput.value = "";
+    }
+    if (els.sendBtn) els.sendBtn.disabled = true;
+    
+    if (els.messagesContainer) {
+        els.messagesContainer.replaceChildren(emptyBlock("Добро пожаловать", "Найдите пользователя по username или откройте существующий диалог."));
+    }
+    
     updateScrollState();
     if (state.messagesListener) state.messagesListener.ref.off("value", state.messagesListener.callback);
     if (state.typingListener) state.typingListener.ref.off("value", state.typingListener.callback);
 }
 
 function renderLoadingMessages() {
-    els.messagesContainer.replaceChildren(emptyBlock("Загрузка", "Получаем историю сообщений."));
+    if (els.messagesContainer) {
+        els.messagesContainer.replaceChildren(emptyBlock("Загрузка", "Получаем историю сообщений."));
+    }
 }
 
 function listenTyping(chatId) {
@@ -684,8 +734,10 @@ function listenTyping(chatId) {
     const callback = snap => {
         const data = snap.val() || {};
         const typingUsers = Object.entries(data).filter(([uid]) => uid !== state.user.uid);
-        els.typingIndicatorContainer.classList.toggle("hidden", typingUsers.length === 0);
-        if (typingUsers.length) {
+        if (els.typingIndicatorContainer) {
+            els.typingIndicatorContainer.classList.toggle("hidden", typingUsers.length === 0);
+        }
+        if (typingUsers.length && els.typingText) {
             els.typingText.textContent = `${typingUsers[0][1].name || "Собеседник"} печатает...`;
         }
     };
@@ -762,10 +814,12 @@ function toggleTheme() {
 
 function applyTheme(theme) {
     document.documentElement.dataset.theme = theme;
-    els.themeToggleBtn?.classList.toggle("active", theme === "dark");
+    if (els.themeToggleBtn) els.themeToggleBtn.classList.toggle("active", theme === "dark");
 }
 
 function setAvatar(element, label, avatarUrl) {
+    if (!element) return;
+    
     element.textContent = "";
     element.style.backgroundImage = "";
     element.classList.remove("has-image");
@@ -818,7 +872,10 @@ function compressAvatar(file) {
 function scrollMessagesToBottom(smooth) {
     requestAnimationFrame(() => {
         const container = els.messagesContainer;
-        if (!container) return;
+        if (!container) {
+            console.warn("Нет контейнера сообщений для скролла");
+            return;
+        }
         
         container.scrollTo({
             top: container.scrollHeight,
@@ -831,7 +888,7 @@ function scrollMessagesToBottom(smooth) {
 
 function updateScrollState() {
     if (!state.activeChatId) {
-        els.scrollBottomBtn.classList.add("hidden");
+        if (els.scrollBottomBtn) els.scrollBottomBtn.classList.add("hidden");
         return;
     }
 
@@ -843,7 +900,9 @@ function updateScrollState() {
     const isBottom = scrollHeight - scrollTop - clientHeight < 96;
     state.isAtBottom = isBottom;
     
-    els.scrollBottomBtn.classList.toggle("hidden", !hasOverflow || isBottom);
+    if (els.scrollBottomBtn) {
+        els.scrollBottomBtn.classList.toggle("hidden", !hasOverflow || isBottom);
+    }
 }
 
 function normalizeUsername(value) {
@@ -855,7 +914,9 @@ function isValidUsername(username) {
 }
 
 function updateCharCounter() {
-    els.charCounter.textContent = `${els.messageInput.value.length}/500`;
+    if (els.charCounter && els.messageInput) {
+        els.charCounter.textContent = `${els.messageInput.value.length}/500`;
+    }
 }
 
 function getInitials(value) {
