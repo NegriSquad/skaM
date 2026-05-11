@@ -1157,3 +1157,133 @@ svg {
         height: 48px;
     }
 }
+/* Улучшенная полоса прокрутки для messages-container */
+.messages-container {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    scrollbar-width: thin !important;
+    scrollbar-color: var(--accent) var(--panel-soft) !important;
+}
+
+.messages-container::-webkit-scrollbar {
+    width: 8px !important;
+    height: 8px !important;
+}
+
+.messages-container::-webkit-scrollbar-track {
+    background: var(--panel-soft) !important;
+    border-radius: 10px !important;
+    margin: 8px 0 !important;
+}
+
+.messages-container::-webkit-scrollbar-thumb {
+    background: var(--accent) !important;
+    border-radius: 10px !important;
+    transition: background 0.2s ease !important;
+}
+
+.messages-container::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-dark) !important;
+}
+
+/* Для всей страницы, если нужно */
+.sidebar .dialogs-list {
+    scrollbar-width: thin !important;
+    scrollbar-color: var(--muted-2) var(--panel-soft) !important;
+}
+
+.sidebar .dialogs-list::-webkit-scrollbar {
+    width: 6px !important;
+}
+
+.sidebar .dialogs-list::-webkit-scrollbar-track {
+    background: var(--panel-soft) !important;
+    border-radius: 10px !important;
+}
+
+.sidebar .dialogs-list::-webkit-scrollbar-thumb {
+    background: var(--muted-2) !important;
+    border-radius: 10px !important;
+}
+
+.sidebar .dialogs-list::-webkit-scrollbar-thumb:hover {
+    background: var(--accent) !important;
+}
+
+/* Общие стили для всех скроллбаров */
+* {
+    scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+    background: var(--panel-soft);
+    border-radius: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+    background: var(--muted-2);
+    border-radius: 10px;
+    transition: background 0.2s ease;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background: var(--accent);
+}
+
+/* Стили для контейнера сообщений с фиксом прокрутки */
+#messagesContainer {
+    overflow-y: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    padding: 18px !important;
+    scroll-behavior: smooth !important;
+}
+
+/* Фикс для авто-скролла при новых сообщениях */
+.message-item {
+    animation: messageIn 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    flex-shrink: 0;
+}
+
+/* Кнопка скролла вниз */
+.scroll-bottom {
+    position: absolute;
+    right: 22px;
+    bottom: 92px;
+    z-index: 10;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: none;
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(42, 171, 238, 0.4);
+    transition: all 0.2s ease;
+    opacity: 0.9;
+}
+
+.scroll-bottom:hover {
+    transform: scale(1.1);
+    opacity: 1;
+    background: var(--accent-dark);
+}
+
+.scroll-bottom.hidden {
+    display: none !important;
+}
+
+.scroll-bottom svg {
+    width: 24px;
+    height: 24px;
+    fill: white;
+}
