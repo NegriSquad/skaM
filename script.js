@@ -968,3 +968,23 @@ function messageAction(label, type) {
     button.textContent = label;
     return button;
 }
+// Диагностика
+setTimeout(() => {
+    console.log("=== ДИАГНОСТИКА ===");
+    console.log("messageInput:", els.messageInput);
+    console.log("messagesContainer:", els.messagesContainer);
+    console.log("sendBtn:", els.sendBtn);
+    console.log("activeChatId:", state.activeChatId);
+    console.log("messageInput disabled:", els.messageInput?.disabled);
+    
+    if (els.messagesContainer) {
+        console.log("messagesContainer styles:", window.getComputedStyle(els.messagesContainer).overflow);
+    }
+    
+    // Принудительно включаем поле ввода если есть активный чат
+    if (state.activeChatId && els.messageInput) {
+        els.messageInput.disabled = false;
+        els.sendBtn.disabled = false;
+        console.log("Поле ввода принудительно включено");
+    }
+}, 2000);
