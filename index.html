@@ -8,6 +8,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
 </head>
 <body>
 <div class="app-shell" id="appShell">
@@ -141,12 +142,19 @@
                     <button id="cancelEditBtn" class="text-btn">Отмена</button>
                 </div>
                 <div class="message-input-wrapper">
+                    <button id="attachBtn" class="attach-btn" title="Прикрепить файл">
+                        <svg viewBox="0 0 24 24" width="24" height="24"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg>
+                    </button>
                     <input type="text" id="messageInput" placeholder="Напишите сообщение..." autocomplete="off" maxlength="500">
+                    <button id="voiceRecordBtn" class="voice-btn" title="Голосовое сообщение">
+                        <svg viewBox="0 0 24 24" width="24" height="24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+                    </button>
                     <button id="sendBtn" class="send-button" title="Отправить" aria-label="Отправить">
                         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/></svg>
                     </button>
                 </div>
                 <div class="input-footer">
+                    <span id="recordingStatus" class="recording-status hidden">🎤 Запись...</span>
                     <span>Enter для отправки</span>
                     <span id="charCounter">0/500</span>
                 </div>
@@ -179,6 +187,19 @@
             </button>
         </div>
         <button id="closeCallBtn" class="ghost-link">Скрыть</button>
+    </div>
+</div>
+
+<!-- Модальное окно отправки видео -->
+<div id="videoUploadModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card">
+        <h2>Отправить видео</h2>
+        <input type="file" id="videoFileInput" accept="video/*" capture="environment">
+        <video id="videoPreview" controls style="width:100%; margin: 16px 0; border-radius: 8px;"></video>
+        <div style="display: flex; gap: 12px; margin-top: 16px;">
+            <button id="sendVideoBtn" class="primary-btn">Отправить</button>
+            <button id="cancelVideoBtn" class="ghost-link">Отмена</button>
+        </div>
     </div>
 </div>
 
