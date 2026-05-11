@@ -353,10 +353,10 @@ function removeSelectedAvatar() {
     updateProfilePreview();
 }
 
-["profileNickname", "profileUsername"].forEach(id => {
-    document.addEventListener("input", event => {
-        if (event.target && event.target.id === id) updateProfilePreview();
-    });
+document.addEventListener("input", event => {
+    if (event.target && (event.target.id === "profileNickname" || event.target.id === "profileUsername")) {
+        updateProfilePreview();
+    }
 });
 
 function listenDialogs() {
@@ -370,8 +370,9 @@ function listenDialogs() {
 
 function renderDialogs(chats) {
     const entries = Object.entries(chats).sort((a, b) => (b[1].lastTimestamp || 0) - (a[1].lastTimestamp || 0));
+    if (!els.dialogsList) return;
     els.dialogsList.replaceChildren();
-    els.dialogsCount.textContent = entries.length;
+    if (els.dialogsCount) els.dialogsCount.textContent = entries.length;
 
     if (!entries.length) {
         els.dialogsList.appendChild(emptyBlock("Диалогов пока нет", "Найдите человека по username и начните переписку."));
@@ -414,6 +415,7 @@ function renderDialogs(chats) {
 
 async function searchUserByUsername(rawUsername) {
     const username = normalizeUsername(rawUsername);
+    if (!els.searchResults) return;
     els.searchResults.classList.remove("hidden");
     els.searchResults.replaceChildren();
 
@@ -487,8 +489,8 @@ async function startDialogWith(uid, userData) {
         });
     }
 
-    els.searchUserInput.value = "";
-    els.searchResults.classList.add("hidden");
+    if (els.searchUserInput) els.searchUserInput.value = "";
+    if (els.searchResults) els.searchResults.classList.add("hidden");
     openChat(chatId, { uid, nickname: userData.nickname, username: userData.username, avatarUrl: userData.avatarUrl || "", bio: userData.bio || "" });
 }
 
@@ -498,13 +500,13 @@ function openChat(chatId, partner) {
     state.editingMessageId = null;
     cancelEditMessage();
 
-    els.currentChatTitle.textContent = partner.nickname || `@${partner.username}`;
-    els.currentChatSubtitle.textContent = partner.bio || `@${partner.username}`;
+    if (els.currentChatTitle) els.currentChatTitle.textContent = partner.nickname || `@${partner.username}`;
+    if (els.currentChatSubtitle) els.currentChatSubtitle.textContent = partner.bio || `@${partner.username}`;
     setAvatar(els.chatAvatar, partner.nickname || partner.username, partner.avatarUrl);
-    els.chatAvatar.classList.remove("muted");
-    els.deleteDialogBtn.classList.remove("hidden");
-    els.messageInput.disabled = false;
-    els.sendBtn.disabled = false;
+    if (els.chatAvatar) els.chatAvatar.classList.remove("muted");
+    if (els.deleteDialogBtn) els.deleteDialogBtn.classList.remove("hidden");
+    if (els.messageInput) els.messageInput.disabled = false;
+    if (els.sendBtn) els.sendBtn.disabled = false;
     
     if (els.voiceCallBtn) els.voiceCallBtn.disabled = false;
     if (els.videoCallBtn) els.videoCallBtn.disabled = false;
@@ -513,11 +515,11 @@ function openChat(chatId, partner) {
     listenMessages(chatId);
     listenTyping(chatId);
 
-    if (window.innerWidth <= 768) els.chatArea.classList.add("open");
+    if (window.innerWidth <= 768 && els.chatArea) els.chatArea.classList.add("open");
 }
 
 function listenMessages(chatId) {
-    if (state.messagesListener) state.messagesListener.ref.off("value", state.messagesListener.callback);
+    if (state.messagesListener) state.messagesListener.ref?.off("value", state.messagesListener.callback);
 
     const ref = db.ref(`private_messages/${chatId}`).orderByChild("timestamp").limitToLast(100);
     const callback = snap => {
@@ -537,7 +539,9 @@ function renderMessages(messages) {
     const wasAtBottom = state.isAtBottom;
 
     if (!messages.length) {
-        els.messagesContainer.replaceChildren(emptyBlock("Сообщений пока нет", "Напишите первым и начните диалог."));
+        if (els.messagesContainer) {
+            els.messagesContainer.replaceChildren(emptyBlock("Сообщений пока нет", "Напишите первым и начните диалог."));
+        }
         return;
     }
 
@@ -556,9 +560,11 @@ function renderMessages(messages) {
         fragment.appendChild(createMessageNode(message));
     });
 
-    els.messagesContainer.replaceChildren(fragment);
-    if (wasAtBottom) scrollMessagesToBottom(false);
-    requestAnimationFrame(updateScrollState);
+    if (els.messagesContainer) {
+        els.messagesContainer.replaceChildren(fragment);
+        if (wasAtBottom) scrollMessagesToBottom(false);
+        requestAnimationFrame(updateScrollState);
+    }
 }
 
 function createMessageNode(message) {
@@ -601,7 +607,7 @@ function createMessageNode(message) {
     } else {
         const text = document.createElement("p");
         text.className = "message-text";
-        text.textContent = message.deleted ? "Сообщение удалено" : message.text;
+        text.textContent = message.deleted ? "Сообщение удалено" : (message.text || "");
         if (message.deleted) text.classList.add("muted-text");
         content = text;
     }
@@ -634,7 +640,7 @@ function createMessageNode(message) {
 
 async function sendOrUpdateMessage() {
     if (!state.activeChatId || !state.activePartner) return;
-    const text = els.messageInput.value.trim();
+    const text = els.messageInput?.value.trim();
     if (!text) return;
 
     try {
@@ -657,7 +663,7 @@ async function sendOrUpdateMessage() {
             deleted: false
         });
         await updateChatLastMessage(text);
-        els.messageInput.value = "";
+        if (els.messageInput) els.messageInput.value = "";
         updateCharCounter();
         await clearTypingIndicator();
         scrollMessagesToBottom(true);
@@ -667,6 +673,7 @@ async function sendOrUpdateMessage() {
 }
 
 async function updateChatLastMessage(text, timestamp = Date.now()) {
+    if (!state.activeChatId || !state.activePartner) return;
     await db.ref(`user_chats/${state.user.uid}/${state.activeChatId}`).update({
         lastMessage: text,
         lastTimestamp: timestamp,
@@ -689,15 +696,15 @@ async function updateChatLastMessage(text, timestamp = Date.now()) {
 
 function beginEditMessage(message) {
     state.editingMessageId = message.id;
-    els.messageInput.value = message.text;
-    els.messageInput.focus();
-    els.editBanner.classList.remove("hidden");
+    if (els.messageInput) els.messageInput.value = message.text;
+    if (els.messageInput) els.messageInput.focus();
+    if (els.editBanner) els.editBanner.classList.remove("hidden");
     updateCharCounter();
 }
 
 function cancelEditMessage() {
     state.editingMessageId = null;
-    els.editBanner.classList.add("hidden");
+    if (els.editBanner) els.editBanner.classList.add("hidden");
     if (els.messageInput) {
         els.messageInput.value = "";
         updateCharCounter();
@@ -733,37 +740,45 @@ async function deleteCurrentDialog() {
 function renderEmptyChat() {
     state.activeChatId = null;
     state.activePartner = null;
-    els.currentChatTitle.textContent = "Выберите диалог";
-    els.currentChatSubtitle.textContent = "Сообщения появятся здесь";
-    els.chatAvatar.textContent = "sM";
-    els.chatAvatar.style.backgroundImage = "";
-    els.chatAvatar.classList.add("muted");
-    els.deleteDialogBtn.classList.add("hidden");
-    els.messageInput.disabled = true;
-    els.sendBtn.disabled = true;
+    if (els.currentChatTitle) els.currentChatTitle.textContent = "Выберите диалог";
+    if (els.currentChatSubtitle) els.currentChatSubtitle.textContent = "Сообщения появятся здесь";
+    if (els.chatAvatar) {
+        els.chatAvatar.textContent = "sM";
+        els.chatAvatar.style.backgroundImage = "";
+        els.chatAvatar.classList.add("muted");
+    }
+    if (els.deleteDialogBtn) els.deleteDialogBtn.classList.add("hidden");
+    if (els.messageInput) els.messageInput.disabled = true;
+    if (els.sendBtn) els.sendBtn.disabled = true;
     
     if (els.voiceCallBtn) els.voiceCallBtn.disabled = true;
     if (els.videoCallBtn) els.videoCallBtn.disabled = true;
     
-    els.messagesContainer.replaceChildren(emptyBlock("Добро пожаловать", "Найдите пользователя по username или откройте существующий диалог."));
+    if (els.messagesContainer) {
+        els.messagesContainer.replaceChildren(emptyBlock("Добро пожаловать", "Найдите пользователя по username или откройте существующий диалог."));
+    }
     updateScrollState();
-    if (state.messagesListener) state.messagesListener.ref.off("value", state.messagesListener.callback);
-    if (state.typingListener) state.typingListener.ref.off("value", state.typingListener.callback);
+    if (state.messagesListener) state.messagesListener.ref?.off("value", state.messagesListener.callback);
+    if (state.typingListener) state.typingListener.ref?.off("value", state.typingListener.callback);
 }
 
 function renderLoadingMessages() {
-    els.messagesContainer.replaceChildren(emptyBlock("Загрузка", "Получаем историю сообщений."));
+    if (els.messagesContainer) {
+        els.messagesContainer.replaceChildren(emptyBlock("Загрузка", "Получаем историю сообщений."));
+    }
 }
 
 function listenTyping(chatId) {
-    if (state.typingListener) state.typingListener.ref.off("value", state.typingListener.callback);
+    if (state.typingListener) state.typingListener.ref?.off("value", state.typingListener.callback);
 
     const ref = db.ref(`typing/${chatId}`);
     const callback = snap => {
         const data = snap.val() || {};
         const typingUsers = Object.entries(data).filter(([uid]) => uid !== state.user.uid);
-        els.typingIndicatorContainer.classList.toggle("hidden", typingUsers.length === 0);
-        if (typingUsers.length) {
+        if (els.typingIndicatorContainer) {
+            els.typingIndicatorContainer.classList.toggle("hidden", typingUsers.length === 0);
+        }
+        if (typingUsers.length && els.typingText) {
             els.typingText.textContent = `${typingUsers[0][1].name || "Собеседник"} печатает...`;
         }
     };
@@ -1017,4 +1032,153 @@ async function startVoiceRecording() {
         
         state.mediaRecorder.start();
         state.isRecording = true;
-        state.recordingStartTime
+        state.recordingStartTime = Date.now();
+        
+        if (els.voiceRecordBtn) els.voiceRecordBtn.classList.add("recording");
+        if (els.recordingStatus) els.recordingStatus.classList.remove("hidden");
+        
+        // Auto stop after 60 seconds
+        setTimeout(() => {
+            if (state.isRecording) stopVoiceRecording();
+        }, 60000);
+        
+    } catch (error) {
+        console.error("Microphone error:", error);
+        alert("Не удалось получить доступ к микрофону");
+    }
+}
+
+function stopVoiceRecording() {
+    if (state.mediaRecorder && state.isRecording) {
+        state.mediaRecorder.stop();
+        state.isRecording = false;
+        
+        if (els.voiceRecordBtn) els.voiceRecordBtn.classList.remove("recording");
+        if (els.recordingStatus) els.recordingStatus.classList.add("hidden");
+    }
+}
+
+async function sendVoiceMessage(audioBlob) {
+    if (!state.activeChatId) return;
+    
+    try {
+        const duration = Math.round((Date.now() - (state.recordingStartTime || Date.now())) / 1000);
+        const fileName = `voice_${Date.now()}.webm`;
+        const filePath = `voice_messages/${state.activeChatId}/${fileName}`;
+        
+        const uploadTask = storage.ref(filePath).put(audioBlob);
+        
+        uploadTask.on('state_changed', 
+            null,
+            (error) => console.error("Upload error:", error),
+            async () => {
+                const downloadURL = await storage.ref(filePath).getDownloadURL();
+                
+                await db.ref(`private_messages/${state.activeChatId}`).push({
+                    senderId: state.user.uid,
+                    type: 'voice',
+                    voiceUrl: downloadURL,
+                    duration: `${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, '0')}`,
+                    timestamp: Date.now(),
+                    deleted: false
+                });
+                
+                await updateChatLastMessage("🎤 Голосовое сообщение");
+                scrollMessagesToBottom(true);
+            }
+        );
+    } catch (error) {
+        console.error("Send voice error:", error);
+        alert("Не удалось отправить голосовое сообщение");
+    }
+}
+
+// ========== VIDEO MESSAGE FUNCTIONS ==========
+
+function openVideoUpload() {
+    if (els.videoUploadModal) els.videoUploadModal.classList.remove("hidden");
+}
+
+function closeVideoUpload() {
+    if (els.videoUploadModal) els.videoUploadModal.classList.add("hidden");
+    if (els.videoFileInput) els.videoFileInput.value = "";
+    if (els.videoPreview) els.videoPreview.src = "";
+    state.selectedVideoFile = null;
+}
+
+function previewVideo(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    if (!file.type.startsWith("video/")) {
+        alert("Пожалуйста, выберите видео файл");
+        return;
+    }
+    
+    state.selectedVideoFile = file;
+    if (els.videoPreview) {
+        els.videoPreview.src = URL.createObjectURL(file);
+    }
+}
+
+async function sendVideoMessage() {
+    if (!state.selectedVideoFile || !state.activeChatId) return;
+    
+    try {
+        const fileName = `video_${Date.now()}.mp4`;
+        const filePath = `video_messages/${state.activeChatId}/${fileName}`;
+        
+        const uploadTask = storage.ref(filePath).put(state.selectedVideoFile);
+        
+        uploadTask.on('state_changed',
+            null,
+            (error) => console.error("Upload error:", error),
+            async () => {
+                const downloadURL = await storage.ref(filePath).getDownloadURL();
+                
+                await db.ref(`private_messages/${state.activeChatId}`).push({
+                    senderId: state.user.uid,
+                    type: 'video',
+                    videoUrl: downloadURL,
+                    timestamp: Date.now(),
+                    deleted: false
+                });
+                
+                await updateChatLastMessage("📹 Видеосообщение");
+                scrollMessagesToBottom(true);
+                closeVideoUpload();
+            }
+        );
+    } catch (error) {
+        console.error("Send video error:", error);
+        alert("Не удалось отправить видео");
+    }
+}
+
+// ========== CALL FUNCTIONS (simplified) ==========
+
+async function startCall(type) {
+    alert(`Функция звонков в разработке. Вы выбрали ${type === 'video' ? 'видеозвонок' : 'голосовой звонок'}`);
+}
+
+function listenForCalls() {}
+
+async function acceptCall() {}
+
+function closeCallModal() {
+    if (els.callModal) els.callModal.classList.add("hidden");
+}
+
+function toggleMicrophone() {
+    alert("Функция в разработке");
+}
+
+function toggleVideo() {
+    alert("Функция в разработке");
+}
+
+async function endCall() {
+    closeCallModal();
+}
+
+// End of file
