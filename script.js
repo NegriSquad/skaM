@@ -1187,93 +1187,252 @@ function showNotification(title, body, icon) {
     };
 }
 
-// ========== VOICE RECORDING ==========
+// ========== VOICE RECORDING FIXED ==========
 async function toggleVoiceRecording() {
     if (state.isRecording) {
-        stopVoiceRecording();
+        await stopVoiceRecording();
     } else {
-        startVoiceRecording();
+        await startVoiceRecording();
     }
 }
 
 async function startVoiceRecording() {
     try {
+        // Запрашиваем разрешение на микрофон
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        state.mediaRecorder = new MediaRecorder(stream);
+        
+        // Проверяем поддержку форматов
+        const mimeType = MediaRecorder.isTypeSupported('audio/webm') 
+            ? 'audio/webm' 
+            : MediaRecorder.isTypeSupported('audio/mp4')
+            ? 'audio/mp4'
+            : 'audio/webm';
+        
+        state.mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
         state.audioChunks = [];
         
         state.mediaRecorder.ondataavailable = (event) => {
-            state.audioChunks.push(event.data);
+            if (event.data.size > 0) {
+                state.audioChunks.push(event.data);
+            }
         };
         
         state.mediaRecorder.onstop = async () => {
-            const audioBlob = new Blob(state.audioChunks, { type: 'audio/webm' });
+            // Создаем blob из записанных данных
+            const audioBlob = new Blob(state.audioChunks, { type: mimeType });
             await sendVoiceMessage(audioBlob);
+            
+            // Останавливаем все треки
             stream.getTracks().forEach(track => track.stop());
         };
         
-        state.mediaRecorder.start();
+        state.mediaRecorder.start(1000); // Записываем кусками по 1 секунде
         state.isRecording = true;
         state.recordingStartTime = Date.now();
         
-        if (els.voiceRecordBtn) els.voiceRecordBtn.classList.add("recording");
-        if (els.recordingStatus) els.recordingStatus.classList.remove("hidden");
+        // Обновляем UI
+        if (els.voiceRecordBtn) {
+            els.voiceRecordBtn.classList.add("recording");
+            els.voiceRecordBtn.title = "Остановить запись";
+        }
+        if (els.recordingStatus) {
+            els.recordingStatus.classList.remove("hidden");
+            els.recordingStatus.textContent = "🎤 Запись... 0:00";
+            
+            // Таймер для отображения длительности
+            state.recordingTimer = setInterval(() => {
+                if (state.isRecording) {
+                    const duration = Math.floor((Date.now() - state.recordingStartTime) / 1000);
+                    const minutes = Math.floor(duration / 60);
+                    const seconds = duration % 60;
+                    els.recordingStatus.textContent = `🎤 Запись... ${minutes}:${seconds.toString().padStart(2, '0')}`;
+                }
+            }, 1000);
+        }
         
+        // Авто-остановка через 60 секунд
         setTimeout(() => {
-            if (state.isRecording) stopVoiceRecording();
+            if (state.isRecording) {
+                stopVoiceRecording();
+            }
         }, 60000);
         
     } catch (error) {
         console.error("Microphone error:", error);
-        alert("Не удалось получить доступ к микрофону");
+        alert("Не удалось получить доступ к микрофону. Пожалуйста, проверьте разрешения.");
     }
 }
 
-function stopVoiceRecording() {
+async function stopVoiceRecording() {
     if (state.mediaRecorder && state.isRecording) {
+        // Останавливаем запись
         state.mediaRecorder.stop();
         state.isRecording = false;
         
-        if (els.voiceRecordBtn) els.voiceRecordBtn.classList.remove("recording");
-        if (els.recordingStatus) els.recordingStatus.classList.add("hidden");
+        // Очищаем таймер
+        if (state.recordingTimer) {
+            clearInterval(state.recordingTimer);
+            state.recordingTimer = null;
+        }
+        
+        // Обновляем UI
+        if (els.voiceRecordBtn) {
+            els.voiceRecordBtn.classList.remove("recording");
+            els.voiceRecordBtn.title = "Голосовое сообщение";
+        }
+        if (els.recordingStatus) {
+            els.recordingStatus.classList.add("hidden");
+        }
     }
 }
 
 async function sendVoiceMessage(audioBlob) {
-    if (!state.activeChatId) return;
+    if (!state.activeChatId) {
+        console.error("No active chat");
+        return;
+    }
+    
+    // Проверяем размер аудио (максимум 10MB)
+    if (audioBlob.size > 10 * 1024 * 1024) {
+        alert("Голосовое сообщение слишком большое (максимум 10MB)");
+        return;
+    }
+    
+    // Минимальная длительность 1 секунда
+    const duration = Math.round((Date.now() - (state.recordingStartTime || Date.now())) / 1000);
+    if (duration < 1) {
+        alert("Сообщение слишком короткое");
+        return;
+    }
     
     try {
-        const duration = Math.round((Date.now() - (state.recordingStartTime || Date.now())) / 1000);
-        const fileName = `voice_${Date.now()}.webm`;
+        // Показываем индикатор загрузки
+        const loadingToast = document.createElement('div');
+        loadingToast.className = 'notification-toast';
+        loadingToast.innerHTML = '<span>⏳</span><span>Отправка голосового сообщения...</span>';
+        document.body.appendChild(loadingToast);
+        
+        // Форматируем длительность
+        const minutes = Math.floor(duration / 60);
+        const seconds = duration % 60;
+        const durationStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        
+        // Создаем уникальное имя файла
+        const fileName = `voice_${Date.now()}_${state.user.uid}.webm`;
         const filePath = `voice_messages/${state.activeChatId}/${fileName}`;
         
-        const uploadTask = storage.ref(filePath).put(audioBlob);
+        // Загружаем в Storage
+        const storageRef = storage.ref(filePath);
+        const uploadTask = storageRef.put(audioBlob);
         
-        uploadTask.on('state_changed', 
-            null,
-            (error) => console.error("Upload error:", error),
+        uploadTask.on('state_changed',
+            (snapshot) => {
+                // Прогресс загрузки
+                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                console.log(`Upload progress: ${progress}%`);
+            },
+            (error) => {
+                console.error("Upload error:", error);
+                loadingToast.remove();
+                alert("Ошибка при загрузке голосового сообщения. Попробуйте еще раз.");
+            },
             async () => {
-                const downloadURL = await storage.ref(filePath).getDownloadURL();
+                // Получаем URL загруженного файла
+                const downloadURL = await storageRef.getDownloadURL();
                 
-                await db.ref(`private_messages/${state.activeChatId}`).push({
+                // Сохраняем сообщение в базу данных
+                const messageData = {
                     senderId: state.user.uid,
                     type: 'voice',
                     voiceUrl: downloadURL,
-                    duration: `${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, '0')}`,
+                    duration: durationStr,
                     timestamp: Date.now(),
                     deleted: false,
                     readBy: [state.user.uid]
-                });
+                };
                 
+                await db.ref(`private_messages/${state.activeChatId}`).push(messageData);
                 await updateChatLastMessage("🎤 Голосовое сообщение");
                 scrollMessagesToBottom(true);
+                
+                // Убираем индикатор загрузки
+                loadingToast.remove();
+                
+                // Показываем успех
+                const successToast = document.createElement('div');
+                successToast.className = 'notification-toast';
+                successToast.innerHTML = '<span>✓</span><span>Голосовое сообщение отправлено</span>';
+                document.body.appendChild(successToast);
+                setTimeout(() => {
+                    successToast.classList.add('hide');
+                    setTimeout(() => successToast.remove(), 300);
+                }, 2000);
             }
         );
+        
     } catch (error) {
         console.error("Send voice error:", error);
-        alert("Не удалось отправить голосовое сообщение");
+        alert("Не удалось отправить голосовое сообщение: " + error.message);
     }
 }
+
+// Обработчик клавиш для голосового сообщения (удержание)
+function initVoiceRecordButton() {
+    if (!els.voiceRecordBtn) return;
+    
+    let pressTimer = null;
+    
+    // Начинаем запись при долгом нажатии
+    els.voiceRecordBtn.addEventListener('mousedown', () => {
+        pressTimer = setTimeout(() => {
+            startVoiceRecording();
+        }, 200);
+    });
+    
+    // Останавливаем запись при отпускании
+    els.voiceRecordBtn.addEventListener('mouseup', () => {
+        if (pressTimer) {
+            clearTimeout(pressTimer);
+            pressTimer = null;
+        }
+        if (state.isRecording) {
+            stopVoiceRecording();
+        }
+    });
+    
+    // Для touch устройств
+    els.voiceRecordBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        pressTimer = setTimeout(() => {
+            startVoiceRecording();
+        }, 200);
+    });
+    
+    els.voiceRecordBtn.addEventListener('touchend', () => {
+        if (pressTimer) {
+            clearTimeout(pressTimer);
+            pressTimer = null;
+        }
+        if (state.isRecording) {
+            stopVoiceRecording();
+        }
+    });
+    
+    // Отмена при уходе с кнопки
+    els.voiceRecordBtn.addEventListener('mouseleave', () => {
+        if (pressTimer) {
+            clearTimeout(pressTimer);
+            pressTimer = null;
+        }
+        if (state.isRecording) {
+            stopVoiceRecording();
+        }
+    });
+}
+
+// Добавь вызов этой функции в bindEvents
+// В конце bindEvents() добавь:
+// initVoiceRecordButton();
 
 // ========== VIDEO MESSAGE ==========
 function openVideoUpload() {
