@@ -12,7 +12,6 @@ firebase.initializeApp(firebaseConfig);
 
 const auth = firebase.auth();
 const db = firebase.database();
-const storage = firebase.storage();
 
 const state = {
     user: null,
@@ -34,10 +33,8 @@ const state = {
     recordingTimer: null,
     currentRecordType: null, // 'voice' or 'video'
     videoStream: null,
-    waveformContext: null,
     waveformAnimationId: null,
-    audioContext: null,
-    audioSource: null
+    isRecording: false
 };
 
 const els = {};
@@ -234,7 +231,7 @@ async function loginUser() {
 
 async function logout() {
     await clearTypingIndicator();
-    await stopRecording();
+    await stopRecording(true);
     await auth.signOut();
 }
 
@@ -484,6 +481,8 @@ function openChat(chatId, partner) {
     els.deleteDialogBtn.classList.remove("hidden");
     els.messageInput.disabled = false;
     els.sendBtn.disabled = false;
+    els.voiceRecordBtn.disabled = false;
+    els.videoRecordBtn.disabled = false;
 
     renderLoadingMessages();
     listenMessages(chatId);
@@ -559,7 +558,7 @@ function createMessageNode(message) {
     else if (!message.deleted) {
         const text = document.createElement("p");
         text.className = "message-text";
-        text.textContent = message.text;
+        text.textContent = message.text || "";
         bubble.appendChild(text);
     } else {
         const text = document.createElement("p");
@@ -579,13 +578,16 @@ function createMessageNode(message) {
         const actions = document.createElement("span");
         actions.className = "message-actions";
 
-        const editBtn = messageAction("Изменить", "edit");
-        editBtn.addEventListener("click", () => beginEditMessage(message));
+        if (!message.voiceData && !message.videoData) {
+            const editBtn = messageAction("Изменить", "edit");
+            editBtn.addEventListener("click", () => beginEditMessage(message));
+            actions.appendChild(editBtn);
+        }
 
         const deleteBtn = messageAction("Удалить", "delete");
         deleteBtn.addEventListener("click", () => deleteMessage(message.id));
+        actions.appendChild(deleteBtn);
 
-        actions.append(editBtn, deleteBtn);
         meta.appendChild(actions);
     }
 
@@ -615,14 +617,15 @@ function createVoicePlayer(voiceDataUrl, duration) {
     
     const durationSpan = document.createElement("span");
     durationSpan.className = "voice-duration";
-    durationSpan.textContent = formatDuration(duration);
+    durationSpan.textContent = formatDuration(duration || 0);
     
     const audio = new Audio(voiceDataUrl);
     audio.preload = "metadata";
     
     let isPlaying = false;
     
-    playBtn.addEventListener("click", () => {
+    playBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
         if (isPlaying) {
             audio.pause();
             playBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
@@ -661,7 +664,7 @@ function createVideoPlayer(videoDataUrl) {
 }
 
 function formatDuration(seconds) {
-    if (!seconds) return "0:00";
+    if (!seconds || isNaN(seconds)) return "0:00";
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -699,66 +702,38 @@ async function sendOrUpdateMessage() {
     }
 }
 
-async function sendVoiceRecording() {
-    if (state.recordedChunks.length === 0) return;
-    
-    const blob = new Blob(state.recordedChunks, { type: 'audio/webm' });
-    const reader = new FileReader();
-    
-    reader.onloadend = async () => {
-        const duration = (Date.now() - state.recordingStartTime) / 1000;
-        
-        await db.ref(`private_messages/${state.activeChatId}`).push({
-            senderId: state.user.uid,
-            voiceData: reader.result,
-            voiceDuration: duration,
-            timestamp: Date.now(),
-            editedAt: null,
-            deleted: false
-        });
-        await updateChatLastMessage("🎤 Голосовое сообщение");
-        cancelRecording();
-    };
-    
-    reader.readAsDataURL(blob);
-}
-
-async function sendVideoRecording() {
-    if (state.recordedChunks.length === 0) return;
-    
-    const blob = new Blob(state.recordedChunks, { type: 'video/webm' });
-    const reader = new FileReader();
-    
-    reader.onloadend = async () => {
-        await db.ref(`private_messages/${state.activeChatId}`).push({
-            senderId: state.user.uid,
-            videoData: reader.result,
-            timestamp: Date.now(),
-            editedAt: null,
-            deleted: false
-        });
-        await updateChatLastMessage("📹 Видеосообщение");
-        cancelRecording();
-    };
-    
-    reader.readAsDataURL(blob);
-}
-
 async function startRecording(type) {
     if (!state.activeChatId) {
         alert("Сначала выберите диалог");
         return;
     }
     
-    await stopRecording();
+    if (state.isRecording) {
+        alert("Уже идет запись");
+        return;
+    }
+    
+    await stopRecording(true);
     state.currentRecordType = type;
     state.recordedChunks = [];
+    state.isRecording = true;
     
     try {
         if (type === 'voice') {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            state.mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-            setupMediaRecorder();
+            state.mediaRecorder = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4' });
+            
+            state.mediaRecorder.ondataavailable = (event) => {
+                if (event.data && event.data.size > 0) {
+                    state.recordedChunks.push(event.data);
+                }
+            };
+            
+            state.mediaRecorder.onstop = () => {
+                // Clean up stream
+                stream.getTracks().forEach(track => track.stop());
+            };
+            
             state.recordingStartTime = Date.now();
             state.mediaRecorder.start(100);
             
@@ -770,8 +745,34 @@ async function startRecording(type) {
             const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
             state.videoStream = stream;
             els.videoPreview.srcObject = stream;
-            state.mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
-            setupMediaRecorder();
+            
+            // Try to find supported MIME type
+            let mimeType = '';
+            const videoMimes = ['video/webm', 'video/mp4', 'video/mpeg'];
+            for (const mime of videoMimes) {
+                if (MediaRecorder.isTypeSupported(mime)) {
+                    mimeType = mime;
+                    break;
+                }
+            }
+            
+            state.mediaRecorder = new MediaRecorder(stream, { mimeType });
+            
+            state.mediaRecorder.ondataavailable = (event) => {
+                if (event.data && event.data.size > 0) {
+                    state.recordedChunks.push(event.data);
+                }
+            };
+            
+            state.mediaRecorder.onstop = () => {
+                // Clean up stream
+                if (state.videoStream) {
+                    state.videoStream.getTracks().forEach(track => track.stop());
+                    state.videoStream = null;
+                }
+                if (els.videoPreview) els.videoPreview.srcObject = null;
+            };
+            
             state.recordingStartTime = Date.now();
             state.mediaRecorder.start(100);
             
@@ -788,29 +789,16 @@ async function startRecording(type) {
         
     } catch (error) {
         console.error("Recording error:", error);
-        alert("Не удалось получить доступ к микрофону/камере");
+        alert("Не удалось получить доступ к микрофону/камере. Проверьте разрешения.");
         cancelRecording();
     }
-}
-
-function setupMediaRecorder() {
-    state.mediaRecorder.ondataavailable = (event) => {
-        if (event.data && event.data.size > 0) {
-            state.recordedChunks.push(event.data);
-        }
-    };
-    
-    state.mediaRecorder.onstop = () => {
-        if (state.currentRecordType === 'voice') {
-            stopWaveformAnimation();
-        }
-    };
 }
 
 function startTimer(type) {
     if (state.recordingTimer) clearInterval(state.recordingTimer);
     
     state.recordingTimer = setInterval(() => {
+        if (!state.recordingStartTime) return;
         const elapsed = Math.floor((Date.now() - state.recordingStartTime) / 1000);
         const mins = Math.floor(elapsed / 60);
         const secs = elapsed % 60;
@@ -824,7 +812,11 @@ function startTimer(type) {
         
         // Auto-stop after 60 seconds
         if (elapsed >= 60) {
-            stopRecording();
+            if (type === 'voice') {
+                sendVoiceRecording();
+            } else {
+                sendVideoRecording();
+            }
         }
     }, 1000);
 }
@@ -837,14 +829,13 @@ function startWaveformAnimation() {
     canvas.width = canvas.clientWidth;
     canvas.height = canvas.clientHeight;
     
-    let animationId;
-    
     function draw() {
-        ctx.fillStyle = 'rgba(42, 171, 238, 0.3)';
+        if (!els.waveformCanvas || !state.isRecording) return;
+        ctx.fillStyle = 'rgba(42, 171, 238, 0.1)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
-        const barCount = 30;
-        const barWidth = canvas.width / barCount - 2;
+        const barCount = 40;
+        const barWidth = (canvas.width / barCount) - 2;
         
         for (let i = 0; i < barCount; i++) {
             const height = Math.random() * canvas.height;
@@ -852,10 +843,9 @@ function startWaveformAnimation() {
             ctx.fillRect(i * (barWidth + 2), canvas.height - height, barWidth, height);
         }
         
-        animationId = requestAnimationFrame(draw);
+        state.waveformAnimationId = requestAnimationFrame(draw);
     }
     
-    state.waveformAnimationId = animationId;
     draw();
 }
 
@@ -871,7 +861,7 @@ function stopWaveformAnimation() {
     }
 }
 
-async function stopRecording() {
+async function stopRecording(keepChunks = false) {
     if (state.recordingTimer) {
         clearInterval(state.recordingTimer);
         state.recordingTimer = null;
@@ -887,23 +877,18 @@ async function stopRecording() {
         if (els.videoPreview) els.videoPreview.srcObject = null;
     }
     
-    if (state.audioSource) {
-        state.audioSource.disconnect();
-        state.audioSource = null;
-    }
-    
-    if (state.audioContext) {
-        await state.audioContext.close();
-        state.audioContext = null;
-    }
-    
     stopWaveformAnimation();
+    
+    if (!keepChunks) {
+        state.recordedChunks = [];
+    }
+    
+    state.isRecording = false;
 }
 
 async function cancelRecording() {
-    await stopRecording();
+    await stopRecording(false);
     
-    state.recordedChunks = [];
     state.currentRecordType = null;
     state.recordingStartTime = null;
     
@@ -921,6 +906,141 @@ async function cancelRecording() {
     
     if (els.videoTimer) els.videoTimer.textContent = "00:00";
     if (els.voiceTimer) els.voiceTimer.textContent = "00:00";
+}
+
+async function sendVoiceRecording() {
+    if (!state.isRecording || state.recordedChunks.length === 0) {
+        cancelRecording();
+        return;
+    }
+    
+    try {
+        // Stop recording first
+        await stopRecording(true);
+        
+        const duration = (Date.now() - state.recordingStartTime) / 1000;
+        const blob = new Blob(state.recordedChunks, { type: 'audio/webm' });
+        
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+            try {
+                await db.ref(`private_messages/${state.activeChatId}`).push({
+                    senderId: state.user.uid,
+                    voiceData: reader.result,
+                    voiceDuration: duration,
+                    timestamp: Date.now(),
+                    editedAt: null,
+                    deleted: false
+                });
+                await updateChatLastMessage("🎤 Голосовое сообщение");
+                
+                // Clean up
+                state.recordedChunks = [];
+                state.currentRecordType = null;
+                state.recordingStartTime = null;
+                state.isRecording = false;
+                
+                // Hide panel
+                if (els.voiceRecorderPanel) els.voiceRecorderPanel.classList.add("hidden");
+                if (els.voiceTimer) els.voiceTimer.textContent = "00:00";
+                
+                // Re-enable input
+                els.messageInput.disabled = false;
+                els.sendBtn.disabled = false;
+                els.voiceRecordBtn.disabled = false;
+                els.videoRecordBtn.disabled = false;
+                
+            } catch (error) {
+                console.error("Send voice error:", error);
+                alert("Не удалось отправить голосовое сообщение");
+                cancelRecording();
+            }
+        };
+        
+        reader.onerror = () => {
+            console.error("FileReader error");
+            alert("Ошибка при обработке записи");
+            cancelRecording();
+        };
+        
+        reader.readAsDataURL(blob);
+        
+    } catch (error) {
+        console.error("Send voice error:", error);
+        alert("Не удалось отправить голосовое сообщение");
+        cancelRecording();
+    }
+}
+
+async function sendVideoRecording() {
+    if (!state.isRecording || state.recordedChunks.length === 0) {
+        cancelRecording();
+        return;
+    }
+    
+    try {
+        // Stop recording first
+        await stopRecording(true);
+        
+        const duration = (Date.now() - state.recordingStartTime) / 1000;
+        
+        // Find the MIME type from the chunks
+        let mimeType = 'video/webm';
+        if (state.recordedChunks[0] && state.recordedChunks[0].type) {
+            mimeType = state.recordedChunks[0].type;
+        }
+        
+        const blob = new Blob(state.recordedChunks, { type: mimeType });
+        
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+            try {
+                await db.ref(`private_messages/${state.activeChatId}`).push({
+                    senderId: state.user.uid,
+                    videoData: reader.result,
+                    videoDuration: duration,
+                    timestamp: Date.now(),
+                    editedAt: null,
+                    deleted: false
+                });
+                await updateChatLastMessage("📹 Видеосообщение");
+                
+                // Clean up
+                state.recordedChunks = [];
+                state.currentRecordType = null;
+                state.recordingStartTime = null;
+                state.isRecording = false;
+                
+                // Hide panel
+                if (els.videoRecorderPanel) els.videoRecorderPanel.classList.add("hidden");
+                if (els.videoTimer) els.videoTimer.textContent = "00:00";
+                
+                // Re-enable input
+                els.messageInput.disabled = false;
+                els.sendBtn.disabled = false;
+                els.voiceRecordBtn.disabled = false;
+                els.videoRecordBtn.disabled = false;
+                
+            } catch (error) {
+                console.error("Send video error:", error);
+                alert("Не удалось отправить видеосообщение. Возможно, файл слишком большой.");
+                cancelRecording();
+            }
+        };
+        
+        reader.onerror = () => {
+            console.error("FileReader error");
+            alert("Ошибка при обработке видео");
+            cancelRecording();
+        };
+        
+        reader.readAsDataURL(blob);
+        
+    } catch (error) {
+        console.error("Send video error:", error);
+        alert("Не удалось отправить видеосообщение");
+        cancelRecording();
+    }
 }
 
 async function updateChatLastMessage(text, timestamp = Date.now()) {
@@ -945,6 +1065,7 @@ async function updateChatLastMessage(text, timestamp = Date.now()) {
 }
 
 function beginEditMessage(message) {
+    if (message.voiceData || message.videoData) return;
     state.editingMessageId = message.id;
     els.messageInput.value = message.text;
     els.messageInput.focus();
@@ -978,7 +1099,7 @@ async function syncLastMessageAfterDelete() {
         .filter(message => !message.deleted)
         .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     const latest = messages[0];
-    await updateChatLastMessage(latest ? latest.text : "Сообщений нет", latest ? latest.timestamp : Date.now());
+    await updateChatLastMessage(latest ? (latest.text || latest.voiceData ? "🎤 Голосовое" : latest.videoData ? "📹 Видео" : "Сообщение") : "Сообщений нет", latest ? latest.timestamp : Date.now());
 }
 
 async function deleteCurrentDialog() {
@@ -998,6 +1119,8 @@ function renderEmptyChat() {
     els.deleteDialogBtn.classList.add("hidden");
     els.messageInput.disabled = true;
     els.sendBtn.disabled = true;
+    els.voiceRecordBtn.disabled = true;
+    els.videoRecordBtn.disabled = true;
     els.messagesContainer.replaceChildren(emptyBlock("Добро пожаловать", "Найдите пользователя по username или откройте существующий диалог."));
     updateScrollState();
     if (state.messagesListener) state.messagesListener.ref.off("value", state.messagesListener.callback);
@@ -1025,7 +1148,7 @@ function listenTyping(chatId) {
 }
 
 function updateTyping(isTyping) {
-    if (!state.activeChatId || !state.user || state.editingMessageId) return;
+    if (!state.activeChatId || !state.user || state.editingMessageId || state.isRecording) return;
     const ref = db.ref(`typing/${state.activeChatId}/${state.user.uid}`);
     if (isTyping) {
         ref.set({ name: state.profile.nickname, timestamp: Date.now() });
