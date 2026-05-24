@@ -71,21 +71,18 @@
                         <small id="sidebarUsername">@username</small>
                     </span>
                 </button>
-                <button id="settingsBtn" class="icon-btn" title="Настройки" aria-label="Настройки">
-                    <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94 0 .31.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/></svg>
+                <button id="themeToggleBtn" class="icon-btn" title="Сменить тему" aria-label="Сменить тему">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/></svg>
                 </button>
-                <button id="themeToggleBtn" class="icon-btn" title="Сменить тему">
-                    <svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/></svg>
-                </button>
-                <button id="globalLogoutBtn" class="icon-btn danger" title="Выйти">
-                    <svg viewBox="0 0 24 24"><path d="M10 17l1.4-1.4L8.8 13H21v-2H8.8l2.6-2.6L10 7l-5 5 5 5z"/><path d="M3 5h9V3H3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h9v-2H3V5z"/></svg>
+                <button id="globalLogoutBtn" class="icon-btn danger" title="Выйти" aria-label="Выйти">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l1.4-1.4L8.8 13H21v-2H8.8l2.6-2.6L10 7l-5 5 5 5z"/><path d="M3 5h9V3H3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h9v-2H3V5z"/></svg>
                 </button>
             </header>
 
             <div class="search-box">
                 <input type="text" id="searchUserInput" placeholder="Найти по @username" autocomplete="off">
-                <button id="searchUserBtn" class="icon-btn accent" title="Поиск">
-                    <svg viewBox="0 0 24 24"><path d="M9.5 3a6.5 6.5 0 0 1 5.18 10.43l4.45 4.44-1.42 1.42-4.44-4.45A6.5 6.5 0 1 1 9.5 3zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z"/></svg>
+                <button id="searchUserBtn" class="icon-btn accent" title="Поиск" aria-label="Поиск">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 3a6.5 6.5 0 0 1 5.18 10.43l4.45 4.44-1.42 1.42-4.44-4.45A6.5 6.5 0 1 1 9.5 3zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z"/></svg>
                 </button>
             </div>
 
@@ -100,8 +97,8 @@
 
         <section class="chat-panel" id="chatArea">
             <header class="chat-top">
-                <button id="backToDialogsBtn" class="icon-btn mobile-only" title="Назад">
-                    <svg viewBox="0 0 24 24"><path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20v-2z"/></svg>
+                <button id="backToDialogsBtn" class="icon-btn mobile-only" title="Назад" aria-label="Назад">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20v-2z"/></svg>
                 </button>
                 <div class="chat-person">
                     <span id="chatAvatar" class="avatar muted">sM</span>
@@ -110,15 +107,20 @@
                         <small id="currentChatSubtitle">Сообщения появятся здесь</small>
                     </span>
                 </div>
-                <button id="deleteDialogBtn" class="icon-btn danger hidden" title="Удалить диалог">
-                    <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V7H6v12zM8 9h8v10H8V9zm7.5-5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                <button id="deleteDialogBtn" class="icon-btn danger hidden" title="Удалить диалог" aria-label="Удалить диалог">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V7H6v12zM8 9h8v10H8V9zm7.5-5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
                 </button>
             </header>
 
-            <div class="messages-container" id="messagesContainer"></div>
-            
-            <button id="scrollBottomBtn" class="scroll-bottom hidden" title="К последним сообщениям">
-                <svg viewBox="0 0 24 24"><path d="M11 4h2v12.2l5.6-5.6L20 12l-8 8-8-8 1.4-1.4 5.6 5.6V4z"/></svg>
+            <div class="messages-container" id="messagesContainer">
+                <div class="empty-state" id="emptyState">
+                    <div class="empty-logo">sM</div>
+                    <h2>Добро пожаловать</h2>
+                    <p>Найдите пользователя по username или откройте существующий диалог.</p>
+                </div>
+            </div>
+            <button id="scrollBottomBtn" class="scroll-bottom hidden" title="К последним сообщениям" aria-label="К последним сообщениям">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4h2v12.2l5.6-5.6L20 12l-8 8-8-8 1.4-1.4 5.6 5.6V4z"/></svg>
             </button>
 
             <div id="typingIndicatorContainer" class="typing-indicator hidden">
@@ -131,23 +133,84 @@
                     <span>Редактирование сообщения</span>
                     <button id="cancelEditBtn" class="text-btn">Отмена</button>
                 </div>
-                <div class="message-input-wrapper">
-                    <input type="text" id="messageInput" placeholder="Напишите сообщение..." autocomplete="off" maxlength="500">
-                    
-                    <div class="media-buttons">
-                        <button id="voiceRecordBtn" class="media-btn" title="Голосовое сообщение">
-                            <svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zm7 6v3a7 7 0 0 1-14 0V9h-2v3c0 4.97 4.03 9 9 9s9-4.03 9-9V9h-2zM11 15h2v4h-2v-4z"/></svg>
+
+                <!-- TELEGRAM STYLE BAR -->
+                <div class="telegram-bottom-ui">
+
+                    <!-- PNG BAR FOR MESSAGE -->
+                    <img src="assets/message-bar.png" class="telegram-message-bg" alt="">
+
+                    <!-- MESSAGE BAR -->
+                    <div class="telegram-input-bar">
+
+                        <button id="voiceRecordBtnTelegram" class="telegram-circle-btn" title="Голосовое сообщение">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zm7 6v3a7 7 0 0 1-14 0V9h-2v3c0 4.97 4.03 9 9 9s9-4.03 9-9V9h-2zM11 15h2v4h-2v-4z"/>
+                            </svg>
                         </button>
-                        <button id="videoRecordBtn" class="media-btn" title="Видеосообщение">
-                            <svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+
+                        <div class="telegram-input-box">
+                            <input type="text" id="messageInput" placeholder="Сообщение" autocomplete="off" maxlength="500">
+                        </div>
+
+                        <button id="videoRecordBtnTelegram" class="telegram-circle-btn" title="Видеосообщение">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
+                            </svg>
                         </button>
+
+                        <button id="emojiBtnTelegram" class="telegram-circle-btn" title="Смайлы">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6z"/>
+                            </svg>
+                        </button>
+
+                        <button id="sendBtnTelegram" class="telegram-circle-btn blue">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/>
+                            </svg>
+                        </button>
+
                     </div>
-                    
-                    <button id="sendBtn" class="send-button" title="Отправить">
-                        <svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/></svg>
-                    </button>
+
+                    <!-- PNG BAR FOR NAV -->
+                    <div class="telegram-nav">
+
+                        <img src="assets/bottom-bar.png" class="telegram-nav-bg" alt="">
+
+                        <button id="navContactsBtn" class="telegram-nav-btn">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M16 11c1.7 0 3-1.3 3-3S17.7 5 16 5s-3 1.3-3 3 1.3 3 3 3zM8 11c1.7 0 3-1.3 3-3S9.7 5 8 5 5 6.3 5 8s1.3 3 3 3zm0 2c-2.3 0-7 1.2-7 3.5V19h14v-2.5C15 14.2 10.3 13 8 13zm8 0c-.3 0-.7 0-1 .1 1.2.9 2 2 2 3.4V19h6v-2.5c0-2.3-4.7-3.5-7-3.5z"/>
+                            </svg>
+                            <span>Контакты</span>
+                        </button>
+
+                        <button id="navCallsBtn" class="telegram-nav-btn">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M6.6 10.8a15.5 15.5 0 006.6 6.6l2.2-2.2a1 1 0 011-.2c1.1.4 2.2.6 3.4.6a1 1 0 011 1V20a1 1 0 01-1 1C10.3 21 3 13.7 3 4a1 1 0 011-1h3.4a1 1 0 011 1c0 1.2.2 2.3.6 3.4a1 1 0 01-.2 1l-2.2 2.4z"/>
+                            </svg>
+                            <span>Звонки</span>
+                        </button>
+
+                        <button id="navChatsBtn" class="telegram-nav-btn active">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M4 4h16v12H5.2L4 17.2V4zm2 2v8h12V6H6z"/>
+                            </svg>
+                            <span>Чаты</span>
+                        </button>
+
+                        <button id="navSettingsBtn" class="telegram-nav-btn">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M19.4 13a7.8 7.8 0 000-2l2.1-1.6-2-3.4-2.5 1a7.6 7.6 0 00-1.7-1L13 2h-4l-.3 2.9a7.6 7.6 0 00-1.7 1l-2.5-1-2 3.4L4.6 11a7.8 7.8 0 000 2l-2.1 1.6 2 3.4 2.5-1a7.6 7.6 0 001.7 1L9 22h4l.3-2.9a7.6 7.6 0 001.7-1l2.5 1 2-3.4-2.1-1.7zM11 15a3 3 0 110-6 3 3 0 010 6z"/>
+                            </svg>
+                            <span>Настройки</span>
+                        </button>
+
+                    </div>
+
                 </div>
-                
+
+                <!-- Оригинальные панели записи -->
                 <div id="voiceRecorderPanel" class="recorder-panel hidden">
                     <div class="recorder-timer">
                         <span class="recording-dot"></span>
@@ -183,15 +246,15 @@
     </main>
 </div>
 
-<div id="profileModal" class="modal hidden" role="dialog">
+<div id="profileModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
     <div class="modal-card">
         <div class="modal-head">
             <div>
                 <h2 id="profileTitle">Профиль</h2>
                 <p>Обновите имя, username и статус.</p>
             </div>
-            <button id="closeProfileBtn" class="icon-btn" title="Закрыть">
-                <svg viewBox="0 0 24 24"><path d="M18.3 5.7L12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3 1.4 1.4z"/></svg>
+            <button id="closeProfileBtn" class="icon-btn" title="Закрыть" aria-label="Закрыть">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.3 5.7L12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3 1.4 1.4z"/></svg>
             </button>
         </div>
         <div class="profile-preview">
@@ -216,6 +279,7 @@
                 <input type="file" id="profileAvatarFile" accept="image/png,image/jpeg,image/webp,image/gif">
                 <button id="removeAvatarBtn" class="small-btn secondary" type="button">Убрать</button>
             </div>
+            <small>Выберите картинку с компьютера. Она будет уменьшена перед сохранением.</small>
         </label>
         <label class="field">
             <span>Статус</span>

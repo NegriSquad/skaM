@@ -26,12 +26,11 @@ const state = {
     searchTimer: null,
     selectedAvatarDataUrl: null,
     isAtBottom: true,
-    // Media recording state
     mediaRecorder: null,
     recordedChunks: [],
     recordingStartTime: null,
     recordingTimer: null,
-    currentRecordType: null, // 'voice' or 'video'
+    currentRecordType: null,
     videoStream: null,
     waveformAnimationId: null,
     isRecording: false
@@ -116,13 +115,86 @@ function bindEvents() {
         updateScrollState();
     });
 
-    // Voice and video recording events
     els.voiceRecordBtn.addEventListener("click", () => startRecording('voice'));
     els.videoRecordBtn.addEventListener("click", () => startRecording('video'));
     els.cancelVoiceBtn.addEventListener("click", cancelRecording);
     els.sendVoiceBtn.addEventListener("click", sendVoiceRecording);
     els.cancelVideoBtn.addEventListener("click", cancelRecording);
     els.sendVideoBtn.addEventListener("click", sendVideoRecording);
+
+    // TELEGRAM UI BINDINGS
+    const sendBtnTelegram = document.getElementById('sendBtnTelegram');
+    const voiceRecordBtnTelegram = document.getElementById('voiceRecordBtnTelegram');
+    const videoRecordBtnTelegram = document.getElementById('videoRecordBtnTelegram');
+    const emojiBtnTelegram = document.getElementById('emojiBtnTelegram');
+    const navContactsBtn = document.getElementById('navContactsBtn');
+    const navCallsBtn = document.getElementById('navCallsBtn');
+    const navChatsBtn = document.getElementById('navChatsBtn');
+    const navSettingsBtn = document.getElementById('navSettingsBtn');
+
+    if (sendBtnTelegram) {
+        sendBtnTelegram.addEventListener('click', () => sendOrUpdateMessage());
+    }
+
+    if (voiceRecordBtnTelegram) {
+        voiceRecordBtnTelegram.addEventListener('click', () => {
+            if (!state.activeChatId) {
+                alert("Сначала выберите диалог");
+                return;
+            }
+            if (!state.isRecording) {
+                startRecording('voice');
+            } else if (state.isRecording && state.currentRecordType === 'voice') {
+                sendVoiceRecording();
+            }
+        });
+    }
+
+    if (videoRecordBtnTelegram) {
+        videoRecordBtnTelegram.addEventListener('click', () => {
+            if (!state.activeChatId) {
+                alert("Сначала выберите диалог");
+                return;
+            }
+            if (!state.isRecording) {
+                startRecording('video');
+            } else if (state.isRecording && state.currentRecordType === 'video') {
+                sendVideoRecording();
+            }
+        });
+    }
+
+    if (emojiBtnTelegram) {
+        emojiBtnTelegram.addEventListener('click', () => {
+            console.log('Emoji picker - можно добавить позже');
+        });
+    }
+
+    if (navContactsBtn) {
+        navContactsBtn.addEventListener('click', () => {
+            els.searchUserInput?.focus();
+        });
+    }
+
+    if (navCallsBtn) {
+        navCallsBtn.addEventListener('click', () => {
+            alert('Функция звонков будет добавлена в следующей версии');
+        });
+    }
+
+    if (navChatsBtn) {
+        navChatsBtn.addEventListener('click', () => {
+            if (window.innerWidth <= 768) {
+                els.chatArea.classList.remove('open');
+            }
+        });
+    }
+
+    if (navSettingsBtn) {
+        navSettingsBtn.addEventListener('click', () => {
+            openProfileModal();
+        });
+    }
 }
 
 async function handleAuthState(user) {
@@ -544,17 +616,14 @@ function createMessageNode(message) {
     const bubble = document.createElement("div");
     bubble.className = "message-bubble";
 
-    // Check if message is voice
     if (message.voiceData) {
         const voiceElement = createVoicePlayer(message.voiceData, message.voiceDuration);
         bubble.appendChild(voiceElement);
     } 
-    // Check if message is video
     else if (message.videoData) {
         const videoElement = createVideoPlayer(message.videoData);
         bubble.appendChild(videoElement);
     }
-    // Text message
     else if (!message.deleted) {
         const text = document.createElement("p");
         text.className = "message-text";
@@ -607,7 +676,6 @@ function createVoicePlayer(voiceDataUrl, duration) {
     const waveform = document.createElement("div");
     waveform.className = "voice-waveform";
     
-    // Create simple waveform bars
     for (let i = 0; i < 20; i++) {
         const bar = document.createElement("div");
         bar.className = "waveform-bar";
@@ -730,7 +798,6 @@ async function startRecording(type) {
             };
             
             state.mediaRecorder.onstop = () => {
-                // Clean up stream
                 stream.getTracks().forEach(track => track.stop());
             };
             
@@ -746,7 +813,6 @@ async function startRecording(type) {
             state.videoStream = stream;
             els.videoPreview.srcObject = stream;
             
-            // Try to find supported MIME type
             let mimeType = '';
             const videoMimes = ['video/webm', 'video/mp4', 'video/mpeg'];
             for (const mime of videoMimes) {
@@ -765,7 +831,6 @@ async function startRecording(type) {
             };
             
             state.mediaRecorder.onstop = () => {
-                // Clean up stream
                 if (state.videoStream) {
                     state.videoStream.getTracks().forEach(track => track.stop());
                     state.videoStream = null;
@@ -781,7 +846,6 @@ async function startRecording(type) {
             startTimer('video');
         }
         
-        // Disable input and buttons during recording
         els.messageInput.disabled = true;
         els.sendBtn.disabled = true;
         els.voiceRecordBtn.disabled = true;
@@ -810,7 +874,6 @@ function startTimer(type) {
             els.videoTimer.textContent = timeStr;
         }
         
-        // Auto-stop after 60 seconds
         if (elapsed >= 60) {
             if (type === 'voice') {
                 sendVoiceRecording();
@@ -892,11 +955,9 @@ async function cancelRecording() {
     state.currentRecordType = null;
     state.recordingStartTime = null;
     
-    // Hide panels
     if (els.voiceRecorderPanel) els.voiceRecorderPanel.classList.add("hidden");
     if (els.videoRecorderPanel) els.videoRecorderPanel.classList.add("hidden");
     
-    // Re-enable input
     if (state.activeChatId) {
         els.messageInput.disabled = false;
         els.sendBtn.disabled = false;
@@ -915,7 +976,6 @@ async function sendVoiceRecording() {
     }
     
     try {
-        // Stop recording first
         await stopRecording(true);
         
         const duration = (Date.now() - state.recordingStartTime) / 1000;
@@ -934,17 +994,14 @@ async function sendVoiceRecording() {
                 });
                 await updateChatLastMessage("🎤 Голосовое сообщение");
                 
-                // Clean up
                 state.recordedChunks = [];
                 state.currentRecordType = null;
                 state.recordingStartTime = null;
                 state.isRecording = false;
                 
-                // Hide panel
                 if (els.voiceRecorderPanel) els.voiceRecorderPanel.classList.add("hidden");
                 if (els.voiceTimer) els.voiceTimer.textContent = "00:00";
                 
-                // Re-enable input
                 els.messageInput.disabled = false;
                 els.sendBtn.disabled = false;
                 els.voiceRecordBtn.disabled = false;
@@ -979,12 +1036,10 @@ async function sendVideoRecording() {
     }
     
     try {
-        // Stop recording first
         await stopRecording(true);
         
         const duration = (Date.now() - state.recordingStartTime) / 1000;
         
-        // Find the MIME type from the chunks
         let mimeType = 'video/webm';
         if (state.recordedChunks[0] && state.recordedChunks[0].type) {
             mimeType = state.recordedChunks[0].type;
@@ -1005,17 +1060,14 @@ async function sendVideoRecording() {
                 });
                 await updateChatLastMessage("📹 Видеосообщение");
                 
-                // Clean up
                 state.recordedChunks = [];
                 state.currentRecordType = null;
                 state.recordingStartTime = null;
                 state.isRecording = false;
                 
-                // Hide panel
                 if (els.videoRecorderPanel) els.videoRecorderPanel.classList.add("hidden");
                 if (els.videoTimer) els.videoTimer.textContent = "00:00";
                 
-                // Re-enable input
                 els.messageInput.disabled = false;
                 els.sendBtn.disabled = false;
                 els.voiceRecordBtn.disabled = false;
@@ -1353,264 +1405,4 @@ function messageAction(label, type) {
     button.type = "button";
     button.textContent = label;
     return button;
-}
-// ===== НАСТРОЙКИ И ОБОИ ЧАТА =====
-
-const wallpaperSettings = {
-    wallpapers: [
-        { name: "По умолчанию", type: "default", value: "" },
-        { name: "Горы", type: "image", value: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=1200&fit=crop" },
-        { name: "Лес", type: "image", value: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800&h=1200&fit=crop" },
-        { name: "Океан", type: "image", value: "https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=800&h=1200&fit=crop" },
-        { name: "Космос", type: "image", value: "https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=800&h=1200&fit=crop" }
-    ],
-    gradients: [
-        { name: "Стандарт", value: "" },
-        { name: "Фиолетовый", value: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" },
-        { name: "Закат", value: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)" },
-        { name: "Океан", value: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)" },
-        { name: "Лес", value: "linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)" },
-        { name: "Ночь", value: "linear-gradient(135deg, #2c3e50 0%, #3498db 100%)" },
-        { name: "Сансет", value: "linear-gradient(135deg, #fa709a 0%, #fee140 100%)" }
-    ]
-};
-
-let settingsPanel = null;
-let isSettingsOpen = false;
-
-function getSavedWallpaper() {
-    return localStorage.getItem("skam-wallpaper") || "";
-}
-
-function saveWallpaper(wallpaperValue) {
-    localStorage.setItem("skam-wallpaper", wallpaperValue);
-    applyWallpaperToChat(wallpaperValue);
-}
-
-function applyWallpaperToChat(wallpaperValue) {
-    const chatPanel = document.getElementById("chatArea");
-    if (!chatPanel) return;
-    
-    if (wallpaperValue && wallpaperValue !== "") {
-        if (wallpaperValue.startsWith("linear-gradient")) {
-            chatPanel.style.background = wallpaperValue;
-            chatPanel.style.backgroundSize = "auto";
-            chatPanel.style.backgroundImage = wallpaperValue;
-        } else if (wallpaperValue.startsWith("http")) {
-            chatPanel.style.backgroundImage = `url(${wallpaperValue})`;
-            chatPanel.style.backgroundSize = "cover";
-            chatPanel.style.backgroundPosition = "center";
-            chatPanel.style.backgroundRepeat = "no-repeat";
-        } else {
-            chatPanel.style.background = "";
-            chatPanel.style.backgroundImage = "";
-        }
-        chatPanel.classList.add("with-wallpaper");
-    } else {
-        chatPanel.style.background = "";
-        chatPanel.style.backgroundImage = "";
-        chatPanel.classList.remove("with-wallpaper");
-    }
-}
-
-function createSettingsPanel() {
-    const panel = document.createElement("div");
-    panel.className = "settings-panel";
-    panel.innerHTML = `
-        <div class="settings-header">
-            <span>⚙️ Настройки мессенджера</span>
-            <button class="close-settings" id="closeSettingsBtn">✕</button>
-        </div>
-        <div class="settings-option">
-            <div style="margin-bottom: 10px; font-weight: 600;">🖼️ Обои чата</div>
-            <div class="wallpaper-grid" id="wallpaperGrid"></div>
-        </div>
-        <div class="settings-option">
-            <div style="margin-bottom: 10px; font-weight: 600;">🎨 Градиенты</div>
-            <div class="color-palette" id="colorPalette"></div>
-        </div>
-        <div class="settings-option">
-            <label>
-                <input type="checkbox" id="showTimestampsSetting"> 🕐 Показывать точное время сообщений
-            </label>
-        </div>
-        <div class="settings-option">
-            <label>
-                <input type="checkbox" id="compactModeSetting"> 📦 Компактный режим (меньше отступов)
-            </label>
-        </div>
-        <div class="settings-option">
-            <label>
-                <input type="checkbox" id="enterToSendSetting"> ⏎ Enter для отправки (Shift+Enter - новая строка)
-            </label>
-        </div>
-    `;
-    
-    // Заполняем сетку обоев
-    const grid = panel.querySelector("#wallpaperGrid");
-    wallpaperSettings.wallpapers.forEach(wp => {
-        const option = document.createElement("div");
-        option.className = "wallpaper-option";
-        if (wp.type === "image" && wp.value) {
-            option.style.backgroundImage = `url(${wp.value})`;
-            option.style.backgroundSize = "cover";
-        } else {
-            option.style.background = "var(--panel-soft)";
-            option.style.border = "1px solid var(--line)";
-            option.style.display = "flex";
-            option.style.alignItems = "center";
-            option.style.justifyContent = "center";
-            option.style.fontSize = "20px";
-            option.innerHTML = "❌";
-        }
-        if (getSavedWallpaper() === wp.value) option.classList.add("selected");
-        option.title = wp.name;
-        option.onclick = () => {
-            saveWallpaper(wp.value);
-            document.querySelectorAll(".wallpaper-option").forEach(opt => opt.classList.remove("selected"));
-            option.classList.add("selected");
-            document.querySelectorAll(".color-option").forEach(opt => opt.classList.remove("selected"));
-        };
-        grid.appendChild(option);
-    });
-    
-    // Заполняем палитру градиентов
-    const colorPalette = panel.querySelector("#colorPalette");
-    wallpaperSettings.gradients.forEach(gradient => {
-        const colorDiv = document.createElement("div");
-        colorDiv.className = "color-option";
-        if (gradient.value) {
-            colorDiv.style.background = gradient.value;
-        } else {
-            colorDiv.style.backgroundColor = "var(--panel)";
-            colorDiv.style.border = "1px solid var(--line)";
-            colorDiv.innerHTML = "<span style='font-size:14px'>◻</span>";
-            colorDiv.style.display = "flex";
-            colorDiv.style.alignItems = "center";
-            colorDiv.style.justifyContent = "center";
-        }
-        if (getSavedWallpaper() === gradient.value) colorDiv.classList.add("selected");
-        colorDiv.title = gradient.name;
-        colorDiv.onclick = () => {
-            saveWallpaper(gradient.value);
-            document.querySelectorAll(".color-option").forEach(opt => opt.classList.remove("selected"));
-            colorDiv.classList.add("selected");
-            document.querySelectorAll(".wallpaper-option").forEach(opt => opt.classList.remove("selected"));
-        };
-        colorPalette.appendChild(colorDiv);
-    });
-    
-    // Настройка отображения времени
-    const timeSetting = panel.querySelector("#showTimestampsSetting");
-    const savedTimeSetting = localStorage.getItem("skam-show-timestamps") === "true";
-    timeSetting.checked = savedTimeSetting;
-    timeSetting.addEventListener("change", (e) => {
-        localStorage.setItem("skam-show-timestamps", e.target.checked);
-        refreshMessagesTimestamps();
-    });
-    
-    // Компактный режим
-    const compactSetting = panel.querySelector("#compactModeSetting");
-    const savedCompact = localStorage.getItem("skam-compact-mode") === "true";
-    compactSetting.checked = savedCompact;
-    compactSetting.addEventListener("change", (e) => {
-        localStorage.setItem("skam-compact-mode", e.target.checked);
-        document.body.classList.toggle("compact-mode", e.target.checked);
-    });
-    if (savedCompact) document.body.classList.add("compact-mode");
-    
-    // Enter для отправки
-    const enterSetting = panel.querySelector("#enterToSendSetting");
-    const savedEnterSetting = localStorage.getItem("skam-enter-to-send") !== "false";
-    enterSetting.checked = savedEnterSetting;
-    enterSetting.addEventListener("change", (e) => {
-        localStorage.setItem("skam-enter-to-send", e.target.checked);
-    });
-    
-    return panel;
-}
-
-function refreshMessagesTimestamps() {
-    const showTimestamps = localStorage.getItem("skam-show-timestamps") === "true";
-    const allTimeElements = document.querySelectorAll(".message-meta time");
-    allTimeElements.forEach(timeEl => {
-        if (showTimestamps) {
-            timeEl.style.display = "";
-        } else {
-            timeEl.style.display = "none";
-        }
-    });
-}
-
-function toggleSettings() {
-    if (isSettingsOpen && settingsPanel) {
-        settingsPanel.remove();
-        settingsPanel = null;
-        isSettingsOpen = false;
-    } else {
-        settingsPanel = createSettingsPanel();
-        const chatPanel = document.querySelector(".chat-panel");
-        if (chatPanel) chatPanel.appendChild(settingsPanel);
-        isSettingsOpen = true;
-        
-        const closeBtn = settingsPanel.querySelector("#closeSettingsBtn");
-        if (closeBtn) {
-            closeBtn.addEventListener("click", () => toggleSettings());
-        }
-        
-        setTimeout(() => {
-            document.addEventListener("click", function closeHandler(e) {
-                if (settingsPanel && !settingsPanel.contains(e.target) && 
-                    e.target.id !== "settingsBtn" && 
-                    !e.target.closest("#settingsBtn")) {
-                    toggleSettings();
-                    document.removeEventListener("click", closeHandler);
-                }
-            });
-        }, 10);
-    }
-}
-
-// Инициализация настроек
-function initSettings() {
-    const savedWallpaper = getSavedWallpaper();
-    if (savedWallpaper) applyWallpaperToChat(savedWallpaper);
-    
-    const settingsBtn = document.getElementById("settingsBtn");
-    if (settingsBtn) {
-        settingsBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            toggleSettings();
-        });
-    }
-    
-    // Применяем настройку Enter
-    const enterToSend = localStorage.getItem("skam-enter-to-send") !== "false";
-    if (!enterToSend) {
-        const messageInput = document.getElementById("messageInput");
-        if (messageInput) {
-            messageInput.addEventListener("keydown", (e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    sendOrUpdateMessage();
-                }
-            });
-        }
-    }
-}
-
-// Запускаем инициализацию после загрузки
-if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initSettings);
-} else {
-    initSettings();
-}
-
-// Перехватываем рендер сообщений для обновления отображения времени
-const originalRenderMessages = window.renderMessages;
-if (originalRenderMessages) {
-    window.renderMessages = function(messages) {
-        originalRenderMessages(messages);
-        setTimeout(refreshMessagesTimestamps, 50);
-    };
 }
