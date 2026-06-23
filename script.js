@@ -2259,4 +2259,136 @@ function messageAction(label, type) {
     button.type = "button";
     button.textContent = label;
     return button;
+    // ============================================
+// ИСПРАВЛЕНИЕ ДЛЯ МОБИЛЬНЫХ УСТРОЙСТВ
+// ============================================
+
+// Блокировка скролла body при открытии чата на мобильных
+function toggleBodyScroll(block) {
+    if (window.innerWidth <= 768) {
+        if (block) {
+            document.body.classList.add('no-scroll');
+        } else {
+            document.body.classList.remove('no-scroll');
+        }
+    }
+}
+
+// Модифицируем функцию openChat для блокировки скролла
+const originalOpenChat = openChat;
+openChat = function(chatId, partner) {
+    // Вызываем оригинальную функцию
+    originalOpenChat(chatId, partner);
+    
+    // Блокируем скролл на мобильных
+    if (window.innerWidth <= 768) {
+        toggleBodyScroll(true);
+    }
+};
+
+// Модифицируем функцию renderEmptyChat
+const originalRenderEmptyChat = renderEmptyChat;
+renderEmptyChat = function() {
+    originalRenderEmptyChat();
+    
+    // Разблокируем скролл при закрытии чата
+    if (window.innerWidth <= 768) {
+        toggleBodyScroll(false);
+    }
+};
+
+// Обработчик кнопки "Назад"
+if (els.backToDialogsBtn) {
+    els.backToDialogsBtn.addEventListener("click", function() {
+        els.chatArea.classList.remove("open");
+        toggleBodyScroll(false);
+    });
+}
+
+// Закрытие чата свайпом вправо (для мобильных)
+let touchStartX = 0;
+let touchStartY = 0;
+let isSwiping = false;
+
+if (els.chatArea) {
+    els.chatArea.addEventListener('touchstart', function(e) {
+        if (window.innerWidth > 768) return;
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        isSwiping = true;
+    }, { passive: true });
+
+    els.chatArea.addEventListener('touchmove', function(e) {
+        if (window.innerWidth > 768 || !isSwiping) return;
+        const deltaX = e.touches[0].clientX - touchStartX;
+        const deltaY = e.touches[0].clientY - touchStartY;
+        
+        // Если свайп вправо и это не вертикальный скролл
+        if (deltaX > 50 && Math.abs(deltaY) < Math.abs(deltaX) * 0.5) {
+            els.chatArea.classList.remove('open');
+            toggleBodyScroll(false);
+            isSwiping = false;
+        }
+    }, { passive: true });
+
+    els.chatArea.addEventListener('touchend', function() {
+        isSwiping = false;
+    }, { passive: true });
+}
+
+// Обработчик изменения размера окна
+window.addEventListener('resize', function() {
+    if (window.innerWidth > 768) {
+        toggleBodyScroll(false);
+    }
+});
+
+// Переопределяем scrollMessagesToBottom для лучшей работы на мобильных
+const originalScrollToBottom = scrollMessagesToBottom;
+scrollMessagesToBottom = function(smooth) {
+    const container = els.messagesContainer;
+    if (!container) return;
+    
+    // Используем requestAnimationFrame для плавности
+    requestAnimationFrame(() => {
+        const targetScroll = container.scrollHeight;
+        
+        if (smooth) {
+            container.scrollTo({
+                top: targetScroll,
+                behavior: 'smooth'
+            });
+        } else {
+            container.scrollTop = targetScroll;
+        }
+        
+        state.isAtBottom = true;
+        
+        // Обновляем состояние после прокрутки
+        setTimeout(updateScrollState, smooth ? 300 : 50);
+    });
+};
+
+// Функция для принудительного обновления высоты чата
+function refreshChatHeight() {
+    if (window.innerWidth <= 768 && els.chatArea) {
+        const chatPanel = els.chatArea;
+        const vh = window.innerHeight;
+        chatPanel.style.height = vh + 'px';
+        chatPanel.style.maxHeight = vh + 'px';
+    }
+}
+
+// Вызываем при открытии чата и изменении размера
+window.addEventListener('resize', refreshChatHeight);
+window.addEventListener('orientationchange', function() {
+    setTimeout(refreshChatHeight, 300);
+});
+
+// Добавляем в openChat вызов refreshChatHeight
+const secondOpenChat = openChat;
+openChat = function(chatId, partner) {
+    secondOpenChat(chatId, partner);
+    setTimeout(refreshChatHeight, 100);
+};
 }
