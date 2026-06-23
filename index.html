@@ -1,24 +1,8 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" data-theme="light">
 <head>
-    <link rel="manifest" href="/manifest.json">
-<link rel="apple-touch-icon" href="/icon-192.png">
-
-<!-- Для iOS уведомлений -->
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Localgram">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover, maximum-scale=1.0">
-<!-- Регистрация Service Worker -->
-<script>
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js')
-        .then(reg => console.log('SW registered:', reg))
-        .catch(err => console.log('SW registration failed:', err));
-}
-</script>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover, maximum-scale=1.0">
     <title>Localgram</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -28,55 +12,58 @@ if ('serviceWorker' in navigator) {
 </head>
 <body>
 <div class="app-shell" id="appShell">
+    <!-- Экран входа -->
     <section id="loginScreen" class="auth-screen">
         <div class="auth-card">
             <div class="brand-mark">L</div>
-            <h1>Localgram</h1>
-            <p>Приватные диалоги с быстрым поиском по username.</p>
+            <h1 data-i18n="appName">Localgram</h1>
+            <p data-i18n="loginSubtitle">Приватные диалоги с быстрым поиском по username.</p>
 
             <label class="field">
-                <span>Email</span>
+                <span data-i18n="email">Email</span>
                 <input type="email" id="loginEmail" placeholder="you@example.com" autocomplete="email">
             </label>
             <label class="field">
-                <span>Пароль</span>
+                <span data-i18n="password">Пароль</span>
                 <input type="password" id="loginPassword" placeholder="Минимум 6 символов" autocomplete="current-password">
             </label>
 
-            <button id="doLoginBtn" class="primary-btn">Войти</button>
-            <button id="showRegisterBtn" class="ghost-link">Создать аккаунт</button>
+            <button id="doLoginBtn" class="primary-btn" data-i18n="loginBtn">Войти</button>
+            <button id="showRegisterBtn" class="ghost-link" data-i18n="createAccount">Создать аккаунт</button>
         </div>
     </section>
 
+    <!-- Экран регистрации -->
     <section id="registerScreen" class="auth-screen hidden">
         <div class="auth-card">
             <div class="brand-mark">L</div>
-            <h1>Регистрация</h1>
-            <p>Выберите уникальный username, чтобы вас могли найти.</p>
+            <h1 data-i18n="registerTitle">Регистрация</h1>
+            <p data-i18n="registerSubtitle">Выберите уникальный username, чтобы вас могли найти.</p>
 
             <label class="field">
-                <span>Email</span>
+                <span data-i18n="email">Email</span>
                 <input type="email" id="regEmail" placeholder="you@example.com" autocomplete="email">
             </label>
             <label class="field">
-                <span>Username</span>
+                <span data-i18n="username">Username</span>
                 <input type="text" id="regUsername" placeholder="username" maxlength="24" autocomplete="username">
-                <small>Латиница, цифры и нижнее подчеркивание.</small>
+                <small data-i18n="usernameHint">Латиница, цифры и нижнее подчеркивание.</small>
             </label>
             <label class="field">
-                <span>Имя в профиле</span>
+                <span data-i18n="displayName">Имя в профиле</span>
                 <input type="text" id="regNickname" placeholder="Алексей" maxlength="40">
             </label>
             <label class="field">
-                <span>Пароль</span>
+                <span data-i18n="password">Пароль</span>
                 <input type="password" id="regPassword" placeholder="Минимум 6 символов" autocomplete="new-password">
             </label>
 
-            <button id="doRegisterBtn" class="primary-btn">Зарегистрироваться</button>
-            <button id="showLoginFromRegBtn" class="ghost-link">Уже есть аккаунт</button>
+            <button id="doRegisterBtn" class="primary-btn" data-i18n="registerBtn">Зарегистрироваться</button>
+            <button id="showLoginFromRegBtn" class="ghost-link" data-i18n="haveAccount">Уже есть аккаунт</button>
         </div>
     </section>
 
+    <!-- Основное приложение -->
     <main id="mainAppScreen" class="messenger hidden">
         <aside class="sidebar" id="chatsSidebar">
             <header class="sidebar-top">
@@ -105,7 +92,7 @@ if ('serviceWorker' in navigator) {
             <div id="searchResults" class="search-results hidden"></div>
 
             <div class="section-title">
-                <span>Диалоги</span>
+                <span data-i18n="dialogs">Диалоги</span>
                 <small id="dialogsCount">0</small>
             </div>
             <div id="dialogsList" class="dialogs-list"></div>
@@ -146,13 +133,11 @@ if ('serviceWorker' in navigator) {
 
             <footer class="composer">
                 <div id="editBanner" class="edit-banner hidden">
-                    <span>Редактирование сообщения</span>
-                    <button id="cancelEditBtn" class="text-btn">Отмена</button>
+                    <span data-i18n="editingMessage">Редактирование сообщения</span>
+                    <button id="cancelEditBtn" class="text-btn" data-i18n="cancel">Отмена</button>
                 </div>
 
-                <!-- TELEGRAM STYLE BAR -->
                 <div id="telegramBottomUI" class="telegram-bottom-ui hidden">
-                    <!-- MESSAGE BAR -->
                     <div class="telegram-input-bar">
                         <button id="voiceRecordBtnTelegram" class="telegram-circle-btn" title="Голосовое сообщение">
                             <svg viewBox="0 0 24 24">
@@ -183,39 +168,37 @@ if ('serviceWorker' in navigator) {
                         </button>
                     </div>
 
-                    <!-- NAVIGATION BAR -->
                     <div class="telegram-nav">
                         <button id="navContactsBtn" class="telegram-nav-btn">
                             <svg viewBox="0 0 24 24">
                                 <path d="M16 11c1.7 0 3-1.3 3-3S17.7 5 16 5s-3 1.3-3 3 1.3 3 3 3zM8 11c1.7 0 3-1.3 3-3S9.7 5 8 5 5 6.3 5 8s1.3 3 3 3zm0 2c-2.3 0-7 1.2-7 3.5V19h14v-2.5C15 14.2 10.3 13 8 13zm8 0c-.3 0-.7 0-1 .1 1.2.9 2 2 2 3.4V19h6v-2.5c0-2.3-4.7-3.5-7-3.5z"/>
                             </svg>
-                            <span>Контакты</span>
+                            <span data-i18n="contacts">Контакты</span>
                         </button>
 
                         <button id="navCallsBtn" class="telegram-nav-btn">
                             <svg viewBox="0 0 24 24">
                                 <path d="M6.6 10.8a15.5 15.5 0 006.6 6.6l2.2-2.2a1 1 0 011-.2c1.1.4 2.2.6 3.4.6a1 1 0 011 1V20a1 1 0 01-1 1C10.3 21 3 13.7 3 4a1 1 0 011-1h3.4a1 1 0 011 1c0 1.2.2 2.3.6 3.4a1 1 0 01-.2 1l-2.2 2.4z"/>
                             </svg>
-                            <span>Звонки</span>
+                            <span data-i18n="calls">Звонки</span>
                         </button>
 
                         <button id="navChatsBtn" class="telegram-nav-btn active">
                             <svg viewBox="0 0 24 24">
                                 <path d="M4 4h16v12H5.2L4 17.2V4zm2 2v8h12V6H6z"/>
                             </svg>
-                            <span>Чаты</span>
+                            <span data-i18n="chats">Чаты</span>
                         </button>
 
                         <button id="navSettingsBtn" class="telegram-nav-btn">
                             <svg viewBox="0 0 24 24">
                                 <path d="M19.4 13a7.8 7.8 0 000-2l2.1-1.6-2-3.4-2.5 1a7.6 7.6 0 00-1.7-1L13 2h-4l-.3 2.9a7.6 7.6 0 00-1.7 1l-2.5-1-2 3.4L4.6 11a7.8 7.8 0 000 2l-2.1 1.6 2 3.4 2.5-1a7.6 7.6 0 001.7 1L9 22h4l.3-2.9a7.6 7.6 0 001.7-1l2.5 1 2-3.4-2.1-1.7zM11 15a3 3 0 110-6 3 3 0 010 6z"/>
                             </svg>
-                            <span>Настройки</span>
+                            <span data-i18n="settings">Настройки</span>
                         </button>
                     </div>
                 </div>
 
-                <!-- Оригинальные панели записи -->
                 <div id="voiceRecorderPanel" class="recorder-panel hidden">
                     <div class="recorder-timer">
                         <span class="recording-dot"></span>
@@ -225,8 +208,8 @@ if ('serviceWorker' in navigator) {
                         <canvas id="waveformCanvas" width="200" height="40"></canvas>
                     </div>
                     <div class="recorder-actions">
-                        <button id="cancelVoiceBtn" class="small-btn secondary">Отмена</button>
-                        <button id="sendVoiceBtn" class="small-btn">Отправить</button>
+                        <button id="cancelVoiceBtn" class="small-btn secondary" data-i18n="cancel">Отмена</button>
+                        <button id="sendVoiceBtn" class="small-btn" data-i18n="send">Отправить</button>
                     </div>
                 </div>
                 
@@ -237,13 +220,13 @@ if ('serviceWorker' in navigator) {
                         <span id="videoTimer">00:00</span>
                     </div>
                     <div class="recorder-actions">
-                        <button id="cancelVideoBtn" class="small-btn secondary">Отмена</button>
-                        <button id="sendVideoBtn" class="small-btn" disabled>Записать</button>
+                        <button id="cancelVideoBtn" class="small-btn secondary" data-i18n="cancel">Отмена</button>
+                        <button id="sendVideoBtn" class="small-btn" data-i18n="send" disabled>Записать</button>
                     </div>
                 </div>
                 
                 <div class="input-footer">
-                    <span>Enter для отправки</span>
+                    <span data-i18n="enterToSend">Enter для отправки</span>
                     <span id="charCounter">0/500</span>
                 </div>
             </footer>
@@ -256,8 +239,8 @@ if ('serviceWorker' in navigator) {
     <div class="modal-card">
         <div class="modal-head">
             <div>
-                <h2 id="profileTitle">Профиль</h2>
-                <p>Обновите имя, username и статус.</p>
+                <h2 id="profileTitle" data-i18n="profile">Профиль</h2>
+                <p data-i18n="profileSubtitle">Обновите имя, username и статус.</p>
             </div>
             <button id="closeProfileBtn" class="icon-btn" title="Закрыть" aria-label="Закрыть">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.3 5.7L12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3 1.4 1.4z"/></svg>
@@ -271,37 +254,39 @@ if ('serviceWorker' in navigator) {
             </div>
         </div>
         <label class="field">
-            <span>Имя</span>
+            <span data-i18n="displayName">Имя</span>
             <input type="text" id="profileNickname" maxlength="40">
         </label>
         <label class="field">
-            <span>Username</span>
+            <span data-i18n="username">Username</span>
             <input type="text" id="profileUsername" maxlength="24">
-            <small>После изменения старый username освободится.</small>
+            <small data-i18n="usernameChangeHint">После изменения старый username освободится.</small>
         </label>
         <label class="field">
-            <span>Аватарка</span>
+            <span data-i18n="avatar">Аватарка</span>
             <div class="avatar-picker">
                 <input type="file" id="profileAvatarFile" accept="image/png,image/jpeg,image/webp,image/gif">
-                <button id="removeAvatarBtn" class="small-btn secondary" type="button">Убрать</button>
+                <button id="removeAvatarBtn" class="small-btn secondary" type="button" data-i18n="remove">Убрать</button>
             </div>
-            <small>Выберите картинку с компьютера. Она будет уменьшена перед сохранением.</small>
+            <small data-i18n="avatarHint">Выберите картинку с компьютера. Она будет уменьшена перед сохранением.</small>
         </label>
         <label class="field">
-            <span>Статус</span>
+            <span data-i18n="status">Статус</span>
             <input type="text" id="profileBio" maxlength="80" placeholder="Например: на связи">
         </label>
-        <button id="saveProfileBtn" class="primary-btn">Сохранить профиль</button>
+        <button id="saveProfileBtn" class="primary-btn" data-i18n="save">Сохранить профиль</button>
     </div>
 </div>
 
-<!-- Модальное окно настроек -->
+<!-- ============================================ -->
+<!-- МОДАЛЬНОЕ ОКНО НАСТРОЕК (ГЛАВНОЕ МЕНЮ) -->
+<!-- ============================================ -->
 <div id="settingsModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
     <div class="modal-card settings-modal">
         <div class="modal-head">
             <div>
-                <h2 id="settingsTitle">Настройки</h2>
-                <p>Управление приложением Localgram</p>
+                <h2 id="settingsTitle" data-i18n="settings">Настройки</h2>
+                <p data-i18n="settingsSubtitle">Управление приложением Localgram</p>
             </div>
             <button id="closeSettingsBtn" class="icon-btn" title="Закрыть" aria-label="Закрыть">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.3 5.7L12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3 1.4 1.4z"/></svg>
@@ -309,89 +294,488 @@ if ('serviceWorker' in navigator) {
         </div>
         
         <div class="settings-list">
-            <!-- Папки -->
-            <button class="settings-item" id="settingsFolders">
+            <button class="settings-item" data-setting="folders">
                 <span class="settings-icon">📁</span>
-                <span class="settings-label">Папки</span>
+                <span class="settings-label" data-i18n="folders">Папки</span>
                 <span class="settings-arrow">›</span>
             </button>
             
-            <!-- Безопасность -->
-            <button class="settings-item" id="settingsSecurity">
+            <button class="settings-item" data-setting="security">
                 <span class="settings-icon">🔒</span>
-                <span class="settings-label">Безопасность</span>
+                <span class="settings-label" data-i18n="security">Безопасность</span>
                 <span class="settings-arrow">›</span>
             </button>
             
-            <!-- Устройства -->
-            <button class="settings-item" id="settingsDevices">
+            <button class="settings-item" data-setting="devices">
                 <span class="settings-icon">📱</span>
-                <span class="settings-label">Устройства</span>
+                <span class="settings-label" data-i18n="devices">Устройства</span>
                 <span class="settings-arrow">›</span>
             </button>
             
-            <!-- Уведомления -->
-            <button class="settings-item" id="settingsNotifications">
+            <button class="settings-item" data-setting="notifications">
                 <span class="settings-icon">🔔</span>
-                <span class="settings-label">Уведомления</span>
+                <span class="settings-label" data-i18n="notifications">Уведомления</span>
                 <span class="settings-arrow">›</span>
             </button>
             
-            <!-- Оформление -->
-            <button class="settings-item" id="settingsAppearance">
+            <button class="settings-item" data-setting="appearance">
                 <span class="settings-icon">🎨</span>
-                <span class="settings-label">Оформление</span>
+                <span class="settings-label" data-i18n="appearance">Оформление</span>
                 <span class="settings-arrow">›</span>
             </button>
             
-            <!-- Язык приложения -->
-            <button class="settings-item" id="settingsLanguage">
+            <button class="settings-item" data-setting="language">
                 <span class="settings-icon">🌐</span>
-                <span class="settings-label">Язык приложения</span>
+                <span class="settings-label" data-i18n="language">Язык приложения</span>
                 <span class="settings-arrow">›</span>
             </button>
             
-            <!-- Сочетания клавиш -->
-            <button class="settings-item" id="settingsShortcuts">
+            <button class="settings-item" data-setting="shortcuts">
                 <span class="settings-icon">⌨️</span>
-                <span class="settings-label">Сочетания клавиш</span>
+                <span class="settings-label" data-i18n="shortcuts">Сочетания клавиш</span>
                 <span class="settings-arrow">›</span>
             </button>
             
-            <!-- MAX для бизнеса -->
-            <button class="settings-item" id="settingsBusiness">
-                <span class="settings-icon">💼</span>
-                <span class="settings-label">Localgram для бизнеса</span>
-                <span class="settings-arrow">›</span>
-            </button>
-            
-            <!-- Помощь -->
-            <button class="settings-item" id="settingsHelp">
+            <button class="settings-item" data-setting="help">
                 <span class="settings-icon">❓</span>
-                <span class="settings-label">Помощь</span>
+                <span class="settings-label" data-i18n="help">Помощь</span>
                 <span class="settings-arrow">›</span>
             </button>
             
-            <!-- О приложении -->
-            <button class="settings-item" id="settingsAbout">
+            <button class="settings-item" data-setting="about">
                 <span class="settings-icon">ℹ️</span>
-                <span class="settings-label">О приложении</span>
+                <span class="settings-label" data-i18n="about">О приложении</span>
                 <span class="settings-arrow">›</span>
             </button>
         </div>
         
-        <!-- Версия приложения внизу -->
         <div class="settings-version">Localgram v1.0.0</div>
     </div>
 </div>
 
-<!-- Модальное окно "О приложении" -->
+<!-- ============================================ -->
+<!-- СТРАНИЦА НАСТРОЕК: ОФОРМЛЕНИЕ -->
+<!-- ============================================ -->
+<div id="appearanceSettings" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card settings-page">
+        <div class="modal-head">
+            <button id="backFromAppearance" class="icon-btn" title="Назад">
+                <svg viewBox="0 0 24 24"><path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20v-2z"/></svg>
+            </button>
+            <div>
+                <h2 data-i18n="appearance">Оформление</h2>
+                <p data-i18n="appearanceSubtitle">Настройка внешнего вида</p>
+            </div>
+            <button id="closeAppearanceBtn" class="icon-btn" title="Закрыть">
+                <svg viewBox="0 0 24 24"><path d="M18.3 5.7L12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3 1.4 1.4z"/></svg>
+            </button>
+        </div>
+        
+        <div class="settings-page-content">
+            <!-- Тема -->
+            <div class="settings-group">
+                <h3 data-i18n="theme">Тема</h3>
+                <div class="theme-options">
+                    <button class="theme-option" data-theme="light">
+                        <div class="theme-preview light-theme"></div>
+                        <span data-i18n="light">Светлая</span>
+                    </button>
+                    <button class="theme-option" data-theme="dark">
+                        <div class="theme-preview dark-theme"></div>
+                        <span data-i18n="dark">Тёмная</span>
+                    </button>
+                    <button class="theme-option" data-theme="system">
+                        <div class="theme-preview system-theme"></div>
+                        <span data-i18n="system">Системная</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Фон чата -->
+            <div class="settings-group">
+                <h3 data-i18n="chatBackground">Фон чата</h3>
+                <div class="bg-options">
+                    <button class="bg-option active" data-bg="default" style="background: var(--chat-bg);">
+                        <span>По умолчанию</span>
+                    </button>
+                    <button class="bg-option" data-bg="gradient1" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        <span>Градиент 1</span>
+                    </button>
+                    <button class="bg-option" data-bg="gradient2" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                        <span>Градиент 2</span>
+                    </button>
+                    <button class="bg-option" data-bg="gradient3" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                        <span>Градиент 3</span>
+                    </button>
+                    <button class="bg-option" data-bg="gradient4" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                        <span>Градиент 4</span>
+                    </button>
+                    <button class="bg-option" data-bg="gradient5" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
+                        <span>Градиент 5</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Стиль сообщений -->
+            <div class="settings-group">
+                <h3 data-i18n="messageStyle">Стиль сообщений</h3>
+                <div class="msg-style-options">
+                    <button class="msg-style-option active" data-style="default">
+                        <div class="msg-preview">
+                            <div class="msg-bubble default-style">Сообщение</div>
+                        </div>
+                        <span>Стандартный</span>
+                    </button>
+                    <button class="msg-style-option" data-style="rounded">
+                        <div class="msg-preview">
+                            <div class="msg-bubble rounded-style">Сообщение</div>
+                        </div>
+                        <span>Закруглённый</span>
+                    </button>
+                    <button class="msg-style-option" data-style="gradient">
+                        <div class="msg-preview">
+                            <div class="msg-bubble gradient-style">Сообщение</div>
+                        </div>
+                        <span>Градиент</span>
+                    </button>
+                    <button class="msg-style-option" data-style="neumorphic">
+                        <div class="msg-preview">
+                            <div class="msg-bubble neumorphic-style">Сообщение</div>
+                        </div>
+                        <span>Неоморфизм</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Цвет акцента -->
+            <div class="settings-group">
+                <h3 data-i18n="accentColor">Цвет акцента</h3>
+                <div class="accent-options">
+                    <button class="accent-option active" data-color="#2aabee" style="background: #2aabee;"></button>
+                    <button class="accent-option" data-color="#ff6b6b" style="background: #ff6b6b;"></button>
+                    <button class="accent-option" data-color="#ffd93d" style="background: #ffd93d;"></button>
+                    <button class="accent-option" data-color="#6bcb77" style="background: #6bcb77;"></button>
+                    <button class="accent-option" data-color="#4d96ff" style="background: #4d96ff;"></button>
+                    <button class="accent-option" data-color="#9b59b6" style="background: #9b59b6;"></button>
+                    <button class="accent-option" data-color="#e17055" style="background: #e17055;"></button>
+                    <button class="accent-option" data-color="#00b894" style="background: #00b894;"></button>
+                </div>
+            </div>
+
+            <button id="resetAppearanceBtn" class="primary-btn secondary-btn" data-i18n="resetDefaults">Сбросить настройки</button>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!-- СТРАНИЦА НАСТРОЕК: ЯЗЫК -->
+<!-- ============================================ -->
+<div id="languageSettings" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card settings-page">
+        <div class="modal-head">
+            <button id="backFromLanguage" class="icon-btn" title="Назад">
+                <svg viewBox="0 0 24 24"><path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20v-2z"/></svg>
+            </button>
+            <div>
+                <h2 data-i18n="language">Язык приложения</h2>
+                <p data-i18n="languageSubtitle">Выберите язык интерфейса</p>
+            </div>
+            <button id="closeLanguageBtn" class="icon-btn" title="Закрыть">
+                <svg viewBox="0 0 24 24"><path d="M18.3 5.7L12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3 1.4 1.4z"/></svg>
+            </button>
+        </div>
+        
+        <div class="settings-page-content">
+            <div class="language-options">
+                <button class="language-option active" data-lang="ru">
+                    <span class="lang-flag">🇷🇺</span>
+                    <span class="lang-name">Русский</span>
+                    <span class="lang-native">Русский</span>
+                </button>
+                <button class="language-option" data-lang="en">
+                    <span class="lang-flag">🇬🇧</span>
+                    <span class="lang-name">English</span>
+                    <span class="lang-native">English</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!-- СТРАНИЦА НАСТРОЕК: УВЕДОМЛЕНИЯ -->
+<!-- ============================================ -->
+<div id="notificationsSettings" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card settings-page">
+        <div class="modal-head">
+            <button id="backFromNotifications" class="icon-btn" title="Назад">
+                <svg viewBox="0 0 24 24"><path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20v-2z"/></svg>
+            </button>
+            <div>
+                <h2 data-i18n="notifications">Уведомления</h2>
+                <p data-i18n="notificationsSubtitle">Настройка уведомлений</p>
+            </div>
+            <button id="closeNotificationsBtn" class="icon-btn" title="Закрыть">
+                <svg viewBox="0 0 24 24"><path d="M18.3 5.7L12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3 1.4 1.4z"/></svg>
+            </button>
+        </div>
+        
+        <div class="settings-page-content">
+            <div class="settings-group">
+                <div class="toggle-setting">
+                    <div>
+                        <h4 data-i18n="pushNotifications">Push-уведомления</h4>
+                        <p data-i18n="pushNotificationsDesc">Получать уведомления о новых сообщениях</p>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="pushNotificationsToggle" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                
+                <div class="toggle-setting">
+                    <div>
+                        <h4 data-i18n="soundNotifications">Звук уведомлений</h4>
+                        <p data-i18n="soundNotificationsDesc">Воспроизводить звук при получении сообщения</p>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="soundNotificationsToggle" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                
+                <div class="toggle-setting">
+                    <div>
+                        <h4 data-i18n="previewNotifications">Превью в уведомлениях</h4>
+                        <p data-i18n="previewNotificationsDesc">Показывать текст сообщения в уведомлении</p>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="previewNotificationsToggle" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!-- СТРАНИЦА НАСТРОЕК: БЕЗОПАСНОСТЬ -->
+<!-- ============================================ -->
+<div id="securitySettings" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card settings-page">
+        <div class="modal-head">
+            <button id="backFromSecurity" class="icon-btn" title="Назад">
+                <svg viewBox="0 0 24 24"><path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20v-2z"/></svg>
+            </button>
+            <div>
+                <h2 data-i18n="security">Безопасность</h2>
+                <p data-i18n="securitySubtitle">Настройки безопасности</p>
+            </div>
+            <button id="closeSecurityBtn" class="icon-btn" title="Закрыть">
+                <svg viewBox="0 0 24 24"><path d="M18.3 5.7L12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3 1.4 1.4z"/></svg>
+            </button>
+        </div>
+        
+        <div class="settings-page-content">
+            <div class="settings-group">
+                <div class="toggle-setting">
+                    <div>
+                        <h4 data-i18n="twoFactorAuth">Двухфакторная аутентификация</h4>
+                        <p data-i18n="twoFactorAuthDesc">Дополнительная защита аккаунта</p>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="twoFactorToggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                
+                <button class="settings-action-btn" id="changePasswordBtn">
+                    <span data-i18n="changePassword">Сменить пароль</span>
+                    <span class="settings-arrow">›</span>
+                </button>
+                
+                <button class="settings-action-btn" id="sessionsBtn">
+                    <span data-i18n="activeSessions">Активные сессии</span>
+                    <span class="settings-arrow">›</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!-- СТРАНИЦА НАСТРОЕК: УСТРОЙСТВА -->
+<!-- ============================================ -->
+<div id="devicesSettings" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card settings-page">
+        <div class="modal-head">
+            <button id="backFromDevices" class="icon-btn" title="Назад">
+                <svg viewBox="0 0 24 24"><path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20v-2z"/></svg>
+            </button>
+            <div>
+                <h2 data-i18n="devices">Устройства</h2>
+                <p data-i18n="devicesSubtitle">Управление устройствами</p>
+            </div>
+            <button id="closeDevicesBtn" class="icon-btn" title="Закрыть">
+                <svg viewBox="0 0 24 24"><path d="M18.3 5.7L12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3 1.4 1.4z"/></svg>
+            </button>
+        </div>
+        
+        <div class="settings-page-content">
+            <div id="devicesList" class="devices-list">
+                <div class="device-item">
+                    <span class="device-icon">💻</span>
+                    <div class="device-info">
+                        <strong>Это устройство</strong>
+                        <span class="device-detail">Chrome на Windows</span>
+                    </div>
+                    <span class="device-status active">Активно</span>
+                </div>
+            </div>
+            <button id="logoutAllDevicesBtn" class="primary-btn danger-btn" data-i18n="logoutAllDevices">Выйти на всех устройствах</button>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!-- СТРАНИЦА НАСТРОЕК: ПОМОЩЬ -->
+<!-- ============================================ -->
+<div id="helpSettings" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card settings-page">
+        <div class="modal-head">
+            <button id="backFromHelp" class="icon-btn" title="Назад">
+                <svg viewBox="0 0 24 24"><path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20v-2z"/></svg>
+            </button>
+            <div>
+                <h2 data-i18n="help">Помощь</h2>
+                <p data-i18n="helpSubtitle">Документация и поддержка</p>
+            </div>
+            <button id="closeHelpBtn" class="icon-btn" title="Закрыть">
+                <svg viewBox="0 0 24 24"><path d="M18.3 5.7L12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3 1.4 1.4z"/></svg>
+            </button>
+        </div>
+        
+        <div class="settings-page-content">
+            <div class="help-items">
+                <button class="help-item" data-help="faq">
+                    <span>❓</span>
+                    <span data-i18n="faq">Часто задаваемые вопросы</span>
+                    <span class="settings-arrow">›</span>
+                </button>
+                <button class="help-item" data-help="guides">
+                    <span>📖</span>
+                    <span data-i18n="guides">Руководства</span>
+                    <span class="settings-arrow">›</span>
+                </button>
+                <button class="help-item" data-help="support">
+                    <span>📧</span>
+                    <span data-i18n="supportContact">Связаться с поддержкой</span>
+                    <span class="settings-arrow">›</span>
+                </button>
+                <button class="help-item" data-help="report">
+                    <span>🐛</span>
+                    <span data-i18n="reportBug">Сообщить об ошибке</span>
+                    <span class="settings-arrow">›</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!-- СТРАНИЦА НАСТРОЕК: СОЧЕТАНИЯ КЛАВИШ -->
+<!-- ============================================ -->
+<div id="shortcutsSettings" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card settings-page">
+        <div class="modal-head">
+            <button id="backFromShortcuts" class="icon-btn" title="Назад">
+                <svg viewBox="0 0 24 24"><path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20v-2z"/></svg>
+            </button>
+            <div>
+                <h2 data-i18n="shortcuts">Сочетания клавиш</h2>
+                <p data-i18n="shortcutsSubtitle">Управление с клавиатуры</p>
+            </div>
+            <button id="closeShortcutsBtn" class="icon-btn" title="Закрыть">
+                <svg viewBox="0 0 24 24"><path d="M18.3 5.7L12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3 1.4 1.4z"/></svg>
+            </button>
+        </div>
+        
+        <div class="settings-page-content">
+            <div class="shortcuts-list">
+                <div class="shortcut-item">
+                    <span class="shortcut-key">Enter</span>
+                    <span class="shortcut-desc" data-i18n="shortcutSend">Отправить сообщение</span>
+                </div>
+                <div class="shortcut-item">
+                    <span class="shortcut-key">Shift + Enter</span>
+                    <span class="shortcut-desc" data-i18n="shortcutNewLine">Новая строка</span>
+                </div>
+                <div class="shortcut-item">
+                    <span class="shortcut-key">Esc</span>
+                    <span class="shortcut-desc" data-i18n="shortcutCancel">Отмена редактирования</span>
+                </div>
+                <div class="shortcut-item">
+                    <span class="shortcut-key">Ctrl + K</span>
+                    <span class="shortcut-desc" data-i18n="shortcutSearch">Поиск пользователей</span>
+                </div>
+                <div class="shortcut-item">
+                    <span class="shortcut-key">Ctrl + N</span>
+                    <span class="shortcut-desc" data-i18n="shortcutNewChat">Новый диалог</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!-- СТРАНИЦА НАСТРОЕК: ПАПКИ -->
+<!-- ============================================ -->
+<div id="foldersSettings" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card settings-page">
+        <div class="modal-head">
+            <button id="backFromFolders" class="icon-btn" title="Назад">
+                <svg viewBox="0 0 24 24"><path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20v-2z"/></svg>
+            </button>
+            <div>
+                <h2 data-i18n="folders">Папки</h2>
+                <p data-i18n="foldersSubtitle">Организация диалогов по папкам</p>
+            </div>
+            <button id="closeFoldersBtn" class="icon-btn" title="Закрыть">
+                <svg viewBox="0 0 24 24"><path d="M18.3 5.7L12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3 1.4 1.4z"/></svg>
+            </button>
+        </div>
+        
+        <div class="settings-page-content">
+            <div id="foldersList" class="folders-list">
+                <div class="folder-item">
+                    <span class="folder-icon">📁</span>
+                    <span class="folder-name">Рабочие</span>
+                    <span class="folder-count">5</span>
+                </div>
+                <div class="folder-item">
+                    <span class="folder-icon">📁</span>
+                    <span class="folder-name">Семья</span>
+                    <span class="folder-count">3</span>
+                </div>
+                <div class="folder-item">
+                    <span class="folder-icon">📁</span>
+                    <span class="folder-name">Друзья</span>
+                    <span class="folder-count">8</span>
+                </div>
+            </div>
+            <button id="createFolderBtn" class="primary-btn" data-i18n="createFolder">Создать папку</button>
+        </div>
+    </div>
+</div>
+
+<!-- О приложении -->
 <div id="aboutModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
     <div class="modal-card about-modal">
         <div class="modal-head">
             <div>
-                <h2 id="aboutTitle">О приложении</h2>
-                <p>Информация о Localgram</p>
+                <h2 id="aboutTitle" data-i18n="about">О приложении</h2>
+                <p data-i18n="aboutSubtitle">Информация о Localgram</p>
             </div>
             <button id="closeAboutBtn" class="icon-btn" title="Закрыть" aria-label="Закрыть">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.3 5.7L12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3 1.4 1.4z"/></svg>
@@ -402,14 +786,14 @@ if ('serviceWorker' in navigator) {
             <div class="about-logo">L</div>
             <h2>Localgram</h2>
             <p class="about-version">Версия 1.0.0</p>
-            <p class="about-description">
+            <p class="about-description" data-i18n="aboutDescription">
                 Приватный мессенджер с быстрым поиском по username.
                 Все сообщения защищены и хранятся в зашифрованном виде.
             </p>
             <div class="about-info">
-                <p><strong>Разработчик:</strong> Localgram Team</p>
-                <p><strong>Лицензия:</strong> MIT</p>
-                <p><strong>Сайт:</strong> <a href="#" onclick="return false;">localgram.app</a></p>
+                <p><strong data-i18n="developer">Разработчик:</strong> Localgram Team</p>
+                <p><strong data-i18n="license">Лицензия:</strong> MIT</p>
+                <p><strong data-i18n="website">Сайт:</strong> <a href="#" onclick="return false;">localgram.app</a></p>
             </div>
         </div>
     </div>
