@@ -2241,3 +2241,25 @@ svg {
         height: -webkit-fill-available;
     }
 }
+/* iOS Safari fixes */
+@supports (-webkit-touch-callout: none) {
+    .messenger {
+        height: -webkit-fill-available;
+    }
+    
+    .chat-panel {
+        height: -webkit-fill-available;
+    }
+    
+    .messages-container {
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+/* Android Chrome fixes */
+@media screen and (max-width: 768px) {
+    .chat-panel {
+        height: 100vh;
+        height: calc(var(--vh, 1vh) * 100);
+    }
+}
