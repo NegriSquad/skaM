@@ -52,7 +52,17 @@ document.addEventListener("DOMContentLoaded", () => {
     initNotifications();
     checkIfMobile();
 });
+// В начале script.js, после объявления переменных
+function setVH() {
+    const vh = window.innerHeight * 0.01;
+    document.documentElement.style.setProperty('--vh', vh + 'px');
+}
 
+window.addEventListener('resize', setVH);
+window.addEventListener('orientationchange', function() {
+    setTimeout(setVH, 300);
+});
+setVH();
 function checkIfMobile() {
     state.isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
