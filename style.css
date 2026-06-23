@@ -1903,3 +1903,341 @@ svg {
 .messages-container::-webkit-scrollbar-thumb:hover {
     background: rgba(113, 129, 145, 0.5);
 }
+/* ============================================
+   ИСПРАВЛЕНИЕ ДЛЯ МОБИЛЬНЫХ УСТРОЙСТВ
+   ============================================ */
+
+/* Основной контейнер - занимает всю высоту */
+.app-shell {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Мессенджер на мобильных */
+@media (max-width: 768px) {
+    .messenger {
+        width: 100%;
+        height: 100vh;
+        height: 100dvh; /* Для современных браузеров */
+        min-height: 100vh;
+        min-height: 100dvh;
+        grid-template-columns: 1fr;
+        margin: 0;
+        border: 0;
+        border-radius: 0;
+        overflow: hidden;
+        position: relative;
+    }
+
+    /* Сайдбар - виден всегда */
+    .sidebar {
+        width: 100%;
+        height: 100%;
+        border-right: 0;
+        display: flex;
+        flex-direction: column;
+        background: var(--panel);
+        position: relative;
+        z-index: 1;
+    }
+
+    /* Чат-панель - поверх сайдбара */
+    .chat-panel {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        height: 100vh;
+        height: 100dvh;
+        z-index: 100;
+        background: var(--chat-bg);
+        transform: translateX(100%);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .chat-panel.open {
+        transform: translateX(0);
+    }
+
+    /* Шапка чата */
+    .chat-top {
+        flex-shrink: 0;
+        min-height: 56px;
+        padding: 8px 12px;
+        background: var(--panel);
+        border-bottom: 1px solid var(--line);
+        z-index: 10;
+    }
+
+    /* Контейнер сообщений - занимает всё свободное место */
+    .messages-container {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 12px 12px 8px;
+        padding-bottom: 4px;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+        height: 100%;
+        max-height: 100%;
+    }
+
+    /* Индикатор печатания */
+    .typing-indicator {
+        flex-shrink: 0;
+        margin: 0 12px 4px;
+        padding: 4px 10px;
+    }
+
+    /* Нижняя часть с композером */
+    .composer {
+        flex-shrink: 0;
+        padding: 6px 10px 8px;
+        background: var(--panel);
+        border-top: 1px solid var(--line);
+        position: relative;
+        z-index: 10;
+    }
+
+    /* Telegram UI */
+    .telegram-bottom-ui {
+        width: 100%;
+    }
+
+    .telegram-input-bar {
+        padding: 6px 8px;
+        gap: 4px;
+        background: transparent;
+    }
+
+    .telegram-input-box {
+        height: 38px;
+        background: var(--panel-soft);
+        border-radius: 20px;
+        padding: 0 14px;
+    }
+
+    .telegram-input-box input {
+        font-size: 16px;
+        height: 100%;
+    }
+
+    .telegram-circle-btn {
+        width: 38px;
+        height: 38px;
+        flex-shrink: 0;
+    }
+
+    .telegram-circle-btn svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    .telegram-circle-btn.blue {
+        background: var(--accent);
+    }
+
+    .telegram-circle-btn.blue:hover {
+        background: var(--accent-dark);
+    }
+
+    /* Навигация внизу */
+    .telegram-nav {
+        height: 56px;
+        padding: 0 6px;
+        background: var(--panel);
+        border-top: 1px solid var(--line);
+        border-radius: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-around;
+        gap: 2px;
+        flex-shrink: 0;
+    }
+
+    .telegram-nav-btn {
+        min-width: 44px;
+        padding: 4px 8px;
+        flex: 1;
+        max-width: 70px;
+    }
+
+    .telegram-nav-btn svg {
+        width: 22px;
+        height: 22px;
+    }
+
+    .telegram-nav-btn span {
+        font-size: 9px;
+        margin-top: 1px;
+    }
+
+    /* Кнопка прокрутки */
+    .scroll-bottom {
+        position: absolute;
+        right: 16px;
+        bottom: 80px;
+        width: 40px;
+        height: 40px;
+        z-index: 50;
+    }
+
+    .scroll-bottom svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    /* Кнопка "Назад" в чате */
+    .mobile-only {
+        display: flex !important;
+    }
+
+    /* Блокировка скролла body когда чат открыт */
+    body.no-scroll {
+        overflow: hidden;
+        position: fixed;
+        width: 100%;
+        height: 100%;
+    }
+}
+
+/* Очень маленькие экраны */
+@media (max-width: 480px) {
+    .chat-top {
+        min-height: 50px;
+        padding: 6px 10px;
+    }
+
+    .chat-top .avatar {
+        width: 34px;
+        height: 34px;
+        flex: 0 0 34px;
+        font-size: 11px;
+    }
+
+    .chat-top strong {
+        font-size: 15px;
+    }
+
+    .chat-top small {
+        font-size: 11px;
+    }
+
+    .messages-container {
+        padding: 8px 8px 4px;
+    }
+
+    .message-item {
+        max-width: 92%;
+    }
+
+    .message-bubble {
+        padding: 7px 9px 5px;
+        font-size: 15px;
+    }
+
+    .composer {
+        padding: 4px 6px 6px;
+    }
+
+    .telegram-input-box {
+        height: 34px;
+        padding: 0 10px;
+    }
+
+    .telegram-input-box input {
+        font-size: 15px;
+    }
+
+    .telegram-circle-btn {
+        width: 34px;
+        height: 34px;
+    }
+
+    .telegram-circle-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .telegram-nav {
+        height: 48px;
+    }
+
+    .telegram-nav-btn {
+        min-width: 36px;
+        padding: 2px 4px;
+    }
+
+    .telegram-nav-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .telegram-nav-btn span {
+        font-size: 8px;
+    }
+
+    .scroll-bottom {
+        right: 10px;
+        bottom: 68px;
+        width: 34px;
+        height: 34px;
+    }
+
+    .scroll-bottom svg {
+        width: 18px;
+        height: 18px;
+    }
+}
+
+/* Альбомная ориентация на телефонах */
+@media (max-width: 768px) and (orientation: landscape) {
+    .chat-top {
+        min-height: 44px;
+        padding: 4px 10px;
+    }
+
+    .chat-top .avatar {
+        width: 30px;
+        height: 30px;
+        flex: 0 0 30px;
+        font-size: 10px;
+    }
+
+    .messages-container {
+        padding: 8px 12px 4px;
+    }
+
+    .composer {
+        padding: 4px 8px 6px;
+    }
+
+    .telegram-nav {
+        height: 44px;
+    }
+
+    .telegram-nav-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .telegram-nav-btn span {
+        font-size: 8px;
+    }
+}
+
+/* Исправление для iOS Safari */
+@supports (-webkit-touch-callout: none) {
+    .messenger,
+    .chat-panel {
+        height: -webkit-fill-available;
+    }
+}
