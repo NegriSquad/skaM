@@ -52,10 +52,11 @@ html,
 body {
     width: 100%;
     height: 100%;
+    margin: 0;
+    padding: 0;
 }
 
 body {
-    margin: 0;
     overflow: hidden;
     color: var(--text);
     background: var(--body-bg);
@@ -70,6 +71,8 @@ input {
 
 button {
     cursor: pointer;
+    background: none;
+    border: none;
 }
 
 svg {
@@ -162,10 +165,6 @@ svg {
     color: var(--input-placeholder);
 }
 
-:root[data-theme="dark"] .field input {
-    color: var(--input-text);
-}
-
 .field input:focus {
     border-color: var(--accent);
     box-shadow: 0 0 0 3px rgba(42, 171, 238, 0.15);
@@ -217,10 +216,14 @@ svg {
 .messenger {
     display: grid;
     width: 100%;
-    height: 100%;
+    height: 100vh;
+    height: 100dvh;
     grid-template-columns: 380px 1fr;
     background: var(--panel);
     overflow: hidden;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
 }
 
 .sidebar {
@@ -230,6 +233,7 @@ svg {
     border-right: 1px solid var(--line);
     background: var(--panel);
     overflow: hidden;
+    height: 100%;
 }
 
 .sidebar-top,
@@ -243,10 +247,11 @@ svg {
 
 .sidebar-top,
 .chat-top {
-    min-height: 64px;
-    padding: 12px 16px;
+    min-height: 56px;
+    padding: 8px 12px;
     border-bottom: 1px solid var(--line);
     background: var(--panel);
+    flex-shrink: 0;
 }
 
 .profile-chip {
@@ -257,7 +262,7 @@ svg {
     gap: 12px;
     border: 0;
     border-radius: 10px;
-    padding: 6px 10px;
+    padding: 4px 8px;
     color: var(--text);
     background: transparent;
     text-align: left;
@@ -268,23 +273,33 @@ svg {
 }
 
 .profile-chip strong {
+    display: block;
     color: var(--text);
+    font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .profile-chip small {
+    display: block;
     color: var(--muted);
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .avatar {
     display: grid;
-    width: 42px;
-    height: 42px;
-    flex: 0 0 42px;
+    width: 38px;
+    height: 38px;
+    flex: 0 0 38px;
     place-items: center;
     border-radius: 50%;
     color: #fff;
     background: linear-gradient(135deg, #2aabee, #7b61ff);
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 700;
     overflow: hidden;
     flex-shrink: 0;
@@ -301,10 +316,10 @@ svg {
 }
 
 .avatar.large {
-    width: 56px;
-    height: 56px;
-    flex-basis: 56px;
-    font-size: 18px;
+    width: 52px;
+    height: 52px;
+    flex-basis: 52px;
+    font-size: 17px;
 }
 
 .avatar.muted {
@@ -313,9 +328,9 @@ svg {
 
 .icon-btn {
     display: grid;
-    width: 40px;
-    height: 40px;
-    flex: 0 0 40px;
+    width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
     place-items: center;
     border: 0;
     border-radius: 10px;
@@ -343,20 +358,20 @@ svg {
 .search-box {
     display: flex;
     gap: 8px;
-    padding: 12px 16px;
+    padding: 8px 12px;
 }
 
 .search-box input {
     min-width: 0;
     flex: 1;
-    height: 40px;
-    padding: 0 14px;
+    height: 36px;
+    padding: 0 12px;
     border: 1px solid var(--line);
     border-radius: 10px;
     outline: none;
     background: var(--input-bg);
     color: var(--input-text);
-    font-size: 15px;
+    font-size: 14px;
     transition: border-color 0.15s, box-shadow 0.15s;
 }
 
@@ -370,38 +385,39 @@ svg {
 }
 
 .search-results {
-    margin: 0 16px 12px;
+    margin: 0 12px 8px;
     border: 1px solid var(--line);
     border-radius: 10px;
     background: var(--panel);
-    max-height: 200px;
+    max-height: 180px;
     overflow-y: auto;
 }
 
 .search-result-item {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 10px 14px;
+    gap: 10px;
+    padding: 8px 12px;
     color: var(--text);
 }
 
 .search-result-item .avatar {
-    width: 36px;
-    height: 36px;
-    flex: 0 0 36px;
-    font-size: 12px;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    font-size: 11px;
 }
 
 .muted-result {
     color: var(--muted);
-    font-size: 14px;
+    font-size: 13px;
+    padding: 8px 12px;
 }
 
 .small-btn {
-    height: 34px;
-    padding: 0 14px;
-    font-size: 13px;
+    height: 30px;
+    padding: 0 12px;
+    font-size: 12px;
     font-weight: 600;
 }
 
@@ -415,9 +431,9 @@ svg {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 16px 6px;
+    padding: 6px 12px 4px;
     color: var(--muted);
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.3px;
@@ -425,32 +441,32 @@ svg {
 
 .section-title small {
     display: grid;
-    min-width: 20px;
-    height: 20px;
+    min-width: 18px;
+    height: 18px;
     place-items: center;
     border-radius: 99px;
     color: #fff;
     background: var(--accent);
-    font-size: 11px;
-    line-height: 20px;
-    padding: 0 8px;
+    font-size: 10px;
+    line-height: 18px;
+    padding: 0 6px;
 }
 
 .dialogs-list {
     min-height: 0;
     flex: 1;
     overflow-y: auto;
-    padding-bottom: 8px;
+    padding-bottom: 4px;
 }
 
 .dialog-item {
     display: flex;
     width: 100%;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     border: 0;
     border-radius: 0;
-    padding: 10px 16px;
+    padding: 8px 12px;
     color: var(--text);
     background: transparent;
     text-align: left;
@@ -463,10 +479,10 @@ svg {
 }
 
 .dialog-item .avatar {
-    width: 48px;
-    height: 48px;
-    flex: 0 0 48px;
-    font-size: 16px;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    font-size: 15px;
 }
 
 .dialog-content {
@@ -476,7 +492,7 @@ svg {
 
 .dialog-content strong {
     display: block;
-    font-size: 15px;
+    font-size: 14px;
     color: var(--text);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -485,7 +501,7 @@ svg {
 
 .dialog-content small {
     display: block;
-    font-size: 13px;
+    font-size: 12px;
     color: var(--muted);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -495,7 +511,7 @@ svg {
 .dialog-item time {
     align-self: flex-start;
     color: var(--muted-2);
-    font-size: 11px;
+    font-size: 10px;
     flex-shrink: 0;
 }
 
@@ -507,6 +523,7 @@ svg {
     position: relative;
     background: var(--chat-bg);
     overflow: hidden;
+    height: 100%;
 }
 
 .chat-person {
@@ -514,12 +531,12 @@ svg {
     min-width: 0;
     flex: 1;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
 }
 
 .chat-person strong {
     display: block;
-    font-size: 16px;
+    font-size: 15px;
     color: var(--text);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -528,7 +545,7 @@ svg {
 
 .chat-person small {
     display: block;
-    font-size: 13px;
+    font-size: 12px;
     color: var(--muted);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -556,14 +573,14 @@ svg {
     min-height: 0;
     flex: 1;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
     overflow-y: auto;
-    padding: 16px 20px;
+    padding: 12px 16px;
     scroll-behavior: smooth;
 }
 
 .messages-container::-webkit-scrollbar {
-    width: 6px;
+    width: 4px;
 }
 
 .messages-container::-webkit-scrollbar-thumb {
@@ -572,36 +589,36 @@ svg {
 }
 
 .empty-state {
-    width: min(340px, 92%);
+    width: min(320px, 92%);
     margin: auto;
     color: var(--muted);
     text-align: center;
 }
 
 .empty-state .empty-logo {
-    margin: 0 auto 14px;
+    margin: 0 auto 12px;
 }
 
 .empty-state h2 {
-    margin: 0 0 6px;
+    margin: 0 0 4px;
     color: var(--text);
-    font-size: 20px;
+    font-size: 18px;
 }
 
 .empty-state p {
     margin: 0;
     line-height: 1.5;
-    font-size: 14px;
+    font-size: 13px;
 }
 
 .date-divider {
     align-self: center;
-    margin: 6px 0;
-    padding: 4px 14px;
+    margin: 4px 0;
+    padding: 3px 12px;
     border-radius: 99px;
     background: rgba(113, 129, 145, 0.2);
     color: var(--muted);
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
 }
 
@@ -617,8 +634,8 @@ svg {
 }
 
 .message-bubble {
-    min-width: 92px;
-    padding: 8px 12px 6px;
+    min-width: 80px;
+    padding: 6px 10px 4px;
     border-radius: 12px 12px 12px 2px;
     background: var(--bubble);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
@@ -632,7 +649,8 @@ svg {
 .message-text {
     margin: 0;
     color: var(--text);
-    line-height: 1.42;
+    line-height: 1.4;
+    font-size: 14px;
     overflow-wrap: anywhere;
     white-space: pre-wrap;
 }
@@ -640,21 +658,22 @@ svg {
 .muted-text {
     color: var(--muted-2);
     font-style: italic;
+    font-size: 13px;
 }
 
 .message-meta {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 8px;
-    margin-top: 4px;
+    gap: 6px;
+    margin-top: 2px;
     color: var(--muted-2);
-    font-size: 11px;
+    font-size: 10px;
 }
 
 .message-actions {
     display: inline-flex;
-    gap: 4px;
+    gap: 3px;
     opacity: 0;
     transition: opacity 0.15s ease;
 }
@@ -665,11 +684,11 @@ svg {
 
 .message-action {
     border: 0;
-    padding: 2px 8px;
-    border-radius: 6px;
+    padding: 1px 6px;
+    border-radius: 4px;
     color: var(--accent);
     background: rgba(42, 171, 238, 0.12);
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 600;
 }
 
@@ -682,13 +701,13 @@ svg {
     display: flex;
     width: fit-content;
     align-items: center;
-    gap: 10px;
-    margin: 0 16px 6px;
-    padding: 6px 14px;
+    gap: 8px;
+    margin: 0 12px 4px;
+    padding: 4px 12px;
     border-radius: 10px;
     color: var(--muted);
     background: var(--panel);
-    font-size: 13px;
+    font-size: 12px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
@@ -698,8 +717,8 @@ svg {
 }
 
 .typing-dots span {
-    width: 6px;
-    height: 6px;
+    width: 5px;
+    height: 5px;
     border-radius: 50%;
     background: var(--accent);
     animation: typing 1.2s infinite ease-in-out;
@@ -715,12 +734,12 @@ svg {
 
 .scroll-bottom {
     position: absolute;
-    right: 20px;
-    bottom: 140px;
+    right: 16px;
+    bottom: 130px;
     z-index: 5;
     display: grid;
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
     place-items: center;
     border: 0;
     border-radius: 50%;
@@ -746,8 +765,8 @@ svg {
 }
 
 .scroll-bottom svg {
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
 }
 
 /* ===== КОМПОЗЕР ===== */
@@ -756,17 +775,19 @@ svg {
     border-top: 1px solid var(--line);
     background: var(--panel);
     flex-shrink: 0;
+    position: relative;
+    z-index: 10;
 }
 
 .edit-banner {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 6px 12px;
+    padding: 4px 10px;
     border-left: 3px solid var(--accent);
     border-radius: 8px;
     background: var(--panel-soft);
-    font-size: 13px;
+    font-size: 12px;
     color: var(--muted);
 }
 
@@ -779,19 +800,19 @@ svg {
 .telegram-input-bar {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
+    gap: 6px;
+    padding: 6px 10px;
     background: var(--panel);
 }
 
 .telegram-input-box {
     flex: 1;
-    height: 42px;
+    height: 38px;
     display: flex;
     align-items: center;
-    padding: 0 16px;
+    padding: 0 14px;
     background: var(--input-bg);
-    border-radius: 12px;
+    border-radius: 10px;
     transition: background 0.3s ease;
 }
 
@@ -813,8 +834,8 @@ svg {
 }
 
 .telegram-circle-btn {
-    width: 42px;
-    height: 42px;
+    width: 38px;
+    height: 38px;
     border: none;
     border-radius: 50%;
     background: transparent;
@@ -831,8 +852,8 @@ svg {
 }
 
 .telegram-circle-btn svg {
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
     fill: var(--muted);
 }
 
@@ -857,7 +878,7 @@ svg {
     flex-direction: row;
     align-items: center;
     justify-content: space-around;
-    padding: 6px 0 8px;
+    padding: 4px 0 6px;
     border-top: 1px solid var(--line);
     background: var(--panel);
 }
@@ -869,10 +890,10 @@ svg {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2px;
+    gap: 1px;
     color: var(--muted-2);
     cursor: pointer;
-    padding: 4px 16px;
+    padding: 2px 12px;
     border-radius: 8px;
     transition: all 0.2s ease;
     font-size: 10px;
@@ -885,13 +906,13 @@ svg {
 }
 
 .telegram-nav-btn svg {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
     fill: currentColor;
 }
 
 .telegram-nav-btn span {
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 500;
     white-space: nowrap;
 }
@@ -907,8 +928,8 @@ svg {
 .input-footer {
     display: flex;
     justify-content: space-between;
-    padding: 4px 12px 6px;
-    font-size: 12px;
+    padding: 2px 12px 4px;
+    font-size: 11px;
     color: var(--muted-2);
     background: var(--panel);
 }
@@ -917,8 +938,8 @@ svg {
 .recorder-panel {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 8px 12px;
+    gap: 10px;
+    padding: 6px 10px;
     background: var(--panel-soft);
     border-radius: 0;
 }
@@ -926,16 +947,16 @@ svg {
 .recorder-timer {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     font-family: monospace;
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 600;
     color: var(--accent);
 }
 
 .recording-dot {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     background: #ff4444;
     animation: pulse 1s infinite;
@@ -947,13 +968,13 @@ svg {
 
 #waveformCanvas {
     width: 100%;
-    height: 36px;
+    height: 32px;
     border-radius: 4px;
 }
 
 .video-preview {
-    width: 100px;
-    height: 72px;
+    width: 80px;
+    height: 60px;
     border-radius: 8px;
     background: #000;
     object-fit: cover;
@@ -961,7 +982,7 @@ svg {
 
 .recorder-actions {
     display: flex;
-    gap: 8px;
+    gap: 6px;
 }
 
 /* ===== МОДАЛКИ ===== */
@@ -971,15 +992,15 @@ svg {
     z-index: 200;
     display: grid;
     place-items: center;
-    padding: 18px;
+    padding: 16px;
     background: rgba(14, 28, 42, 0.42);
     backdrop-filter: blur(8px);
     animation: fadeIn 0.18s ease both;
 }
 
 .modal-card {
-    width: min(460px, 100%);
-    padding: 24px;
+    width: min(440px, 100%);
+    padding: 20px;
     border-radius: 12px;
     background: var(--panel);
     box-shadow: var(--shadow);
@@ -988,10 +1009,12 @@ svg {
 
 .modal-card h2 {
     color: var(--text);
+    font-size: 22px;
 }
 
 .modal-card p {
     color: var(--muted);
+    font-size: 14px;
 }
 
 .modal-head h2 {
@@ -1002,8 +1025,8 @@ svg {
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-bottom: 18px;
-    padding: 14px;
+    margin-bottom: 16px;
+    padding: 12px;
     border-radius: 10px;
     background: var(--panel-soft);
 }
@@ -1011,20 +1034,22 @@ svg {
 .profile-preview strong {
     display: block;
     color: var(--text);
+    font-size: 16px;
 }
 
 .profile-preview small {
     display: block;
-    margin-top: 3px;
+    margin-top: 2px;
     color: var(--muted);
+    font-size: 13px;
 }
 
 .profile-info-grid {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    margin: 16px 0 20px;
-    padding: 16px;
+    gap: 10px;
+    margin: 14px 0 18px;
+    padding: 14px;
     border-radius: 10px;
     background: var(--panel-soft);
 }
@@ -1042,13 +1067,13 @@ svg {
 }
 
 .info-label {
-    font-size: 13px;
+    font-size: 12px;
     color: var(--muted);
     font-weight: 500;
 }
 
 .info-value {
-    font-size: 14px;
+    font-size: 13px;
     color: var(--text);
     font-weight: 500;
     text-align: right;
@@ -1056,22 +1081,22 @@ svg {
 
 /* ===== НАСТРОЙКИ ===== */
 .settings-modal {
-    max-width: 520px;
+    max-width: 500px;
 }
 
 .settings-list {
     display: flex;
     flex-direction: column;
     gap: 2px;
-    margin: 8px 0 16px;
+    margin: 6px 0 14px;
 }
 
 .settings-item {
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 12px;
     width: 100%;
-    padding: 14px 16px;
+    padding: 12px 14px;
     border: none;
     border-radius: 10px;
     background: transparent;
@@ -1086,49 +1111,49 @@ svg {
 }
 
 .settings-icon {
-    font-size: 22px;
-    width: 36px;
+    font-size: 20px;
+    width: 32px;
     flex-shrink: 0;
     text-align: center;
 }
 
 .settings-label {
     flex: 1;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 500;
 }
 
 .settings-arrow {
-    font-size: 20px;
+    font-size: 18px;
     color: var(--muted-2);
     opacity: 0.6;
 }
 
 .settings-version {
     text-align: center;
-    padding: 16px 0 8px;
+    padding: 14px 0 6px;
     color: var(--muted-2);
-    font-size: 13px;
+    font-size: 12px;
     border-top: 1px solid var(--line);
 }
 
 .settings-page {
-    max-width: 560px;
+    max-width: 540px;
     max-height: 90vh;
     overflow-y: auto;
 }
 
 .settings-page-content {
-    padding: 8px 0 16px;
+    padding: 6px 0 14px;
 }
 
 .settings-group {
-    margin-bottom: 24px;
+    margin-bottom: 20px;
 }
 
 .settings-group h3 {
-    margin: 0 0 12px;
-    font-size: 14px;
+    margin: 0 0 10px;
+    font-size: 13px;
     font-weight: 600;
     color: var(--muted);
     text-transform: uppercase;
@@ -1139,7 +1164,7 @@ svg {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 0;
+    padding: 10px 0;
     border-bottom: 1px solid var(--line);
 }
 
@@ -1148,22 +1173,22 @@ svg {
 }
 
 .toggle-setting h4 {
-    margin: 0 0 4px;
-    font-size: 15px;
+    margin: 0 0 3px;
+    font-size: 14px;
     font-weight: 500;
     color: var(--text);
 }
 
 .toggle-setting p {
     margin: 0;
-    font-size: 13px;
+    font-size: 12px;
     color: var(--muted);
 }
 
 .toggle-switch {
     position: relative;
-    width: 50px;
-    height: 28px;
+    width: 46px;
+    height: 26px;
     flex-shrink: 0;
     cursor: pointer;
 }
@@ -1182,15 +1207,15 @@ svg {
     right: 0;
     bottom: 0;
     background: var(--muted-2);
-    border-radius: 28px;
+    border-radius: 26px;
     transition: 0.3s;
 }
 
 .toggle-slider:before {
     content: "";
     position: absolute;
-    height: 20px;
-    width: 20px;
+    height: 18px;
+    width: 18px;
     left: 4px;
     bottom: 4px;
     background: white;
@@ -1203,19 +1228,19 @@ svg {
 }
 
 .toggle-switch input:checked + .toggle-slider:before {
-    transform: translateX(22px);
+    transform: translateX(20px);
 }
 
 .theme-options {
     display: flex;
-    gap: 12px;
+    gap: 10px;
 }
 
 .theme-option {
     flex: 1;
     border: 2px solid var(--line);
     border-radius: 12px;
-    padding: 12px;
+    padding: 10px;
     background: transparent;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -1233,9 +1258,9 @@ svg {
 
 .theme-preview {
     width: 100%;
-    height: 60px;
+    height: 50px;
     border-radius: 8px;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     border: 1px solid var(--line);
 }
 
@@ -1252,7 +1277,7 @@ svg {
 }
 
 .theme-option span {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 500;
     color: var(--text);
 }
@@ -1260,21 +1285,21 @@ svg {
 .bg-options {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
+    gap: 8px;
 }
 
 .bg-option {
-    height: 60px;
+    height: 50px;
     border: 2px solid var(--line);
     border-radius: 10px;
-    padding: 8px;
+    padding: 6px;
     cursor: pointer;
     transition: all 0.2s ease;
     display: flex;
     align-items: center;
     justify-content: center;
     color: white;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
     text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
@@ -1291,13 +1316,13 @@ svg {
 .msg-style-options {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
+    gap: 8px;
 }
 
 .msg-style-option {
     border: 2px solid var(--line);
     border-radius: 10px;
-    padding: 10px;
+    padding: 8px;
     background: transparent;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -1314,17 +1339,17 @@ svg {
 }
 
 .msg-preview {
-    height: 40px;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
 }
 
 .msg-bubble {
-    padding: 4px 10px;
+    padding: 3px 8px;
     border-radius: 8px;
-    font-size: 11px;
+    font-size: 10px;
     background: var(--bubble);
     color: var(--text);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -1350,19 +1375,19 @@ svg {
 }
 
 .msg-style-option span {
-    font-size: 11px;
+    font-size: 10px;
     color: var(--muted);
 }
 
 .accent-options {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     flex-wrap: wrap;
 }
 
 .accent-option {
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
     border: 3px solid transparent;
     cursor: pointer;
@@ -1381,14 +1406,14 @@ svg {
 .language-options {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 
 .language-option {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 14px 16px;
+    gap: 10px;
+    padding: 12px 14px;
     border: 2px solid var(--line);
     border-radius: 10px;
     background: transparent;
@@ -1406,18 +1431,19 @@ svg {
 }
 
 .lang-flag {
-    font-size: 24px;
+    font-size: 22px;
 }
 
 .lang-name {
     font-weight: 500;
     flex: 1;
     color: var(--text);
+    font-size: 14px;
 }
 
 .lang-native {
     color: var(--muted);
-    font-size: 14px;
+    font-size: 13px;
 }
 
 .settings-action-btn {
@@ -1425,13 +1451,13 @@ svg {
     align-items: center;
     justify-content: space-between;
     width: 100%;
-    padding: 14px 0;
+    padding: 12px 0;
     border: none;
     border-bottom: 1px solid var(--line);
     background: transparent;
     color: var(--text);
     cursor: pointer;
-    font-size: 15px;
+    font-size: 14px;
     transition: all 0.2s ease;
 }
 
@@ -1440,14 +1466,14 @@ svg {
 }
 
 .devices-list {
-    margin-bottom: 16px;
+    margin-bottom: 14px;
 }
 
 .device-item {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 12px 0;
+    gap: 10px;
+    padding: 10px 0;
     border-bottom: 1px solid var(--line);
 }
 
@@ -1456,7 +1482,7 @@ svg {
 }
 
 .device-icon {
-    font-size: 24px;
+    font-size: 22px;
 }
 
 .device-info {
@@ -1465,19 +1491,19 @@ svg {
 
 .device-info strong {
     display: block;
-    font-size: 14px;
+    font-size: 13px;
     color: var(--text);
 }
 
 .device-detail {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--muted);
 }
 
 .device-status {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
-    padding: 4px 10px;
+    padding: 3px 8px;
     border-radius: 12px;
 }
 
@@ -1489,20 +1515,20 @@ svg {
 .help-items {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
 }
 
 .help-item {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 14px 12px;
+    gap: 10px;
+    padding: 12px 10px;
     border: none;
     border-radius: 10px;
     background: transparent;
     color: var(--text);
     cursor: pointer;
-    font-size: 15px;
+    font-size: 14px;
     transition: all 0.2s ease;
 }
 
@@ -1525,7 +1551,7 @@ svg {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 8px;
+    padding: 10px 6px;
     border-radius: 8px;
 }
 
@@ -1535,9 +1561,9 @@ svg {
 
 .shortcut-key {
     font-family: monospace;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
-    padding: 4px 12px;
+    padding: 3px 10px;
     border-radius: 6px;
     background: var(--panel-soft);
     color: var(--text);
@@ -1545,49 +1571,50 @@ svg {
 
 .shortcut-desc {
     color: var(--muted);
-    font-size: 14px;
+    font-size: 13px;
 }
 
 .folders-list {
-    margin-bottom: 16px;
+    margin-bottom: 14px;
 }
 
 .folder-item {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 12px 0;
+    gap: 10px;
+    padding: 10px 0;
     border-bottom: 1px solid var(--line);
     cursor: pointer;
     transition: all 0.2s ease;
 }
 
 .folder-item:hover {
-    padding-left: 8px;
+    padding-left: 6px;
 }
 
 .folder-icon {
-    font-size: 20px;
+    font-size: 18px;
 }
 
 .folder-name {
     flex: 1;
     font-weight: 500;
     color: var(--text);
+    font-size: 14px;
 }
 
 .folder-count {
-    font-size: 13px;
+    font-size: 12px;
     color: var(--muted);
     background: var(--panel-soft);
-    padding: 2px 10px;
+    padding: 2px 8px;
     border-radius: 12px;
 }
 
 .secondary-btn {
     background: var(--panel-soft);
     color: var(--text);
-    margin-top: 8px;
+    margin-top: 6px;
 }
 
 .secondary-btn:hover {
@@ -1605,56 +1632,56 @@ svg {
 
 /* ===== О ПРИЛОЖЕНИИ ===== */
 .about-modal {
-    max-width: 420px;
+    max-width: 400px;
     text-align: center;
 }
 
 .about-content {
-    padding: 12px 0;
+    padding: 10px 0;
 }
 
 .about-logo {
     display: grid;
-    width: 72px;
-    height: 72px;
-    margin: 0 auto 16px;
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 14px;
     place-items: center;
     border-radius: 16px;
     color: #fff;
     background: linear-gradient(135deg, var(--accent), #65c7f7);
-    font-size: 32px;
+    font-size: 28px;
     font-weight: 800;
 }
 
 .about-content h2 {
-    margin: 0 0 4px;
-    font-size: 24px;
+    margin: 0 0 2px;
+    font-size: 22px;
     color: var(--text);
 }
 
 .about-version {
     color: var(--muted-2);
-    font-size: 14px;
-    margin-bottom: 16px;
+    font-size: 13px;
+    margin-bottom: 14px;
 }
 
 .about-description {
     color: var(--muted);
-    font-size: 15px;
+    font-size: 14px;
     line-height: 1.6;
-    margin-bottom: 20px;
+    margin-bottom: 18px;
 }
 
 .about-info {
-    padding: 16px;
+    padding: 14px;
     border-radius: 10px;
     background: var(--panel-soft);
     text-align: left;
 }
 
 .about-info p {
-    margin: 6px 0;
-    font-size: 14px;
+    margin: 4px 0;
+    font-size: 13px;
     color: var(--muted);
 }
 
@@ -1671,7 +1698,7 @@ svg {
 @keyframes messageIn {
     from {
         opacity: 0;
-        transform: translate(-8px, 8px) scale(0.98);
+        transform: translate(-6px, 6px) scale(0.98);
     }
     to {
         opacity: 1;
@@ -1682,7 +1709,7 @@ svg {
 @keyframes ownMessageIn {
     from {
         opacity: 0;
-        transform: translate(8px, 8px) scale(0.98);
+        transform: translate(6px, 6px) scale(0.98);
     }
     to {
         opacity: 1;
@@ -1690,21 +1717,10 @@ svg {
     }
 }
 
-@keyframes listItemIn {
-    from {
-        opacity: 0;
-        transform: translateX(-8px);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
-}
-
 @keyframes cardIn {
     from {
         opacity: 0;
-        transform: translateY(12px);
+        transform: translateY(10px);
     }
     to {
         opacity: 1;
@@ -1715,7 +1731,7 @@ svg {
 @keyframes modalIn {
     from {
         opacity: 0;
-        transform: translateY(10px) scale(0.98);
+        transform: translateY(8px) scale(0.98);
     }
     to {
         opacity: 1;
@@ -1775,262 +1791,10 @@ svg {
     display: none !important;
 }
 
-/* ===== МОБИЛЬНАЯ АДАПТАЦИЯ ===== */
-@media (max-width: 768px) {
-    .messenger {
-        grid-template-columns: 1fr;
-    }
-
-    .sidebar {
-        display: flex;
-        border-right: 0;
-    }
-
-    .chat-panel {
-        position: fixed;
-        inset: 0;
-        z-index: 100;
-        transform: translateX(100%);
-        transition: transform 0.25s ease;
-        background: var(--chat-bg);
-        border-radius: 0;
-    }
-
-    .chat-panel.open {
-        transform: translateX(0);
-    }
-
-    .mobile-only {
-        display: grid !important;
-    }
-
-    .message-item {
-        max-width: 85%;
-    }
-
-    .auth-screen {
-        padding: 14px;
-    }
-
-    .auth-card {
-        padding: 24px;
-    }
-
-    .sidebar-top,
-    .chat-top {
-        min-height: 56px;
-        padding: 8px 12px;
-    }
-
-    .chat-person strong {
-        font-size: 15px;
-    }
-
-    .chat-person small {
-        font-size: 12px;
-    }
-
-    .messages-container {
-        padding: 12px 14px;
-    }
-
-    .telegram-input-bar {
-        padding: 6px 10px;
-        gap: 6px;
-    }
-
-    .telegram-circle-btn {
-        width: 36px;
-        height: 36px;
-    }
-
-    .telegram-circle-btn svg {
-        width: 20px;
-        height: 20px;
-    }
-
-    .telegram-input-box {
-        height: 36px;
-        padding: 0 12px;
-    }
-
-    .telegram-input-box input {
-        font-size: 16px;
-    }
-
-    .telegram-nav {
-        padding: 4px 0 6px;
-    }
-
-    .telegram-nav-btn {
-        padding: 4px 12px;
-        font-size: 9px;
-    }
-
-    .telegram-nav-btn svg {
-        width: 22px;
-        height: 22px;
-    }
-
-    .scroll-bottom {
-        right: 12px;
-        bottom: 130px;
-        width: 38px;
-        height: 38px;
-    }
-
-    .scroll-bottom svg {
-        width: 18px;
-        height: 18px;
-    }
-
-    .dialog-item .avatar {
-        width: 44px;
-        height: 44px;
-        flex: 0 0 44px;
-    }
-
-    .search-box {
-        padding: 8px 12px;
-    }
-
-    .search-box input {
-        height: 36px;
-        font-size: 14px;
-    }
-
-    .icon-btn {
-        width: 36px;
-        height: 36px;
-        flex: 0 0 36px;
-    }
-
-    .settings-page {
-        max-width: 100%;
-        margin: 10px;
-        max-height: 95vh;
-    }
-
-    .theme-options {
-        flex-direction: column;
-    }
-
-    .msg-style-options {
-        grid-template-columns: repeat(2, 1fr);
-    }
-
-    .bg-options {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-@media (max-width: 480px) {
-    .message-item {
-        max-width: 92%;
-    }
-
-    .message-actions {
-        opacity: 1;
-    }
-
-    .composer {
-        padding: 0;
-    }
-
-    .telegram-input-bar {
-        padding: 4px 8px;
-        gap: 4px;
-    }
-
-    .telegram-circle-btn {
-        width: 32px;
-        height: 32px;
-    }
-
-    .telegram-circle-btn svg {
-        width: 18px;
-        height: 18px;
-    }
-
-    .telegram-input-box {
-        height: 32px;
-        padding: 0 10px;
-    }
-
-    .telegram-input-box input {
-        font-size: 15px;
-    }
-
-    .telegram-nav {
-        padding: 2px 0 4px;
-    }
-
-    .telegram-nav-btn {
-        padding: 2px 8px;
-        font-size: 8px;
-    }
-
-    .telegram-nav-btn svg {
-        width: 18px;
-        height: 18px;
-    }
-
-    .scroll-bottom {
-        bottom: 120px;
-        width: 34px;
-        height: 34px;
-        right: 10px;
-    }
-
-    .scroll-bottom svg {
-        width: 16px;
-        height: 16px;
-    }
-
-    .sidebar-top,
-    .chat-top {
-        min-height: 50px;
-        padding: 6px 10px;
-    }
-
-    .input-footer span:first-child {
-        display: none;
-    }
-
-    .settings-modal {
-        max-width: 100%;
-        margin: 10px;
-    }
-
-    .settings-item {
-        padding: 12px 14px;
-    }
-
-    .settings-icon {
-        font-size: 20px;
-        width: 32px;
-    }
-
-    .settings-label {
-        font-size: 14px;
-    }
-
-    .about-modal {
-        max-width: 100%;
-        margin: 10px;
-    }
-
-    .about-logo {
-        width: 60px;
-        height: 60px;
-        font-size: 26px;
-    }
-}
-
 /* ===== ВСПОМОГАТЕЛЬНЫЕ КЛАССЫ ===== */
 .avatar-picker {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     align-items: center;
 }
 
@@ -2038,16 +1802,16 @@ svg {
     flex: 1;
     min-width: 0;
     height: auto;
-    padding: 10px;
+    padding: 8px;
     cursor: pointer;
     color: var(--text);
 }
 
 .avatar-picker input[type="file"]::file-selector-button {
-    margin-right: 10px;
+    margin-right: 8px;
     border: 0;
     border-radius: 8px;
-    padding: 8px 12px;
+    padding: 6px 10px;
     color: #fff;
     background: var(--accent);
     font-weight: 700;
@@ -2062,15 +1826,15 @@ svg {
 .voice-message {
     display: flex;
     align-items: center;
-    gap: 12px;
-    min-width: 200px;
+    gap: 10px;
+    min-width: 160px;
     cursor: pointer;
 }
 
 .voice-play-btn {
     display: grid;
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
     place-items: center;
     border: 0;
     border-radius: 50%;
@@ -2085,8 +1849,8 @@ svg {
 }
 
 .voice-play-btn svg {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
 }
 
 .voice-waveform {
@@ -2094,7 +1858,7 @@ svg {
     flex: 1;
     align-items: center;
     gap: 2px;
-    height: 40px;
+    height: 32px;
 }
 
 .waveform-bar {
@@ -2118,53 +1882,584 @@ svg {
 }
 
 .voice-duration {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--muted);
     font-weight: 500;
 }
 
 .video-message {
-    max-width: 280px;
+    max-width: 240px;
     border-radius: 8px;
     overflow: hidden;
 }
 
 .video-player {
     width: 100%;
-    max-height: 300px;
+    max-height: 260px;
     border-radius: 8px;
     cursor: pointer;
 }
 
-.media-buttons {
-    display: flex;
-    gap: 6px;
-    margin-right: 8px;
+/* ===== МОБИЛЬНАЯ АДАПТАЦИЯ ===== */
+@media (max-width: 768px) {
+    .messenger {
+        grid-template-columns: 1fr;
+        height: 100vh;
+        height: 100dvh;
+        border-radius: 0;
+        margin: 0;
+    }
+
+    .sidebar {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        border-right: 0;
+    }
+
+    .sidebar-top {
+        min-height: 48px;
+        padding: 4px 8px;
+    }
+
+    .chat-panel {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        transform: translateX(100%);
+        transition: transform 0.25s ease;
+        background: var(--chat-bg);
+        border-radius: 0;
+        height: 100vh;
+        height: 100dvh;
+    }
+
+    .chat-panel.open {
+        transform: translateX(0);
+    }
+
+    .mobile-only {
+        display: grid !important;
+    }
+
+    .chat-top {
+        min-height: 48px;
+        padding: 4px 8px;
+    }
+
+    .chat-person strong {
+        font-size: 14px;
+    }
+
+    .chat-person small {
+        font-size: 11px;
+    }
+
+    .messages-container {
+        padding: 8px 12px;
+        flex: 1;
+        overflow-y: auto;
+    }
+
+    .telegram-input-bar {
+        padding: 4px 8px;
+        gap: 4px;
+    }
+
+    .telegram-circle-btn {
+        width: 34px;
+        height: 34px;
+    }
+
+    .telegram-circle-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .telegram-input-box {
+        height: 34px;
+        padding: 0 10px;
+    }
+
+    .telegram-input-box input {
+        font-size: 15px;
+    }
+
+    .telegram-nav {
+        padding: 2px 0 4px;
+    }
+
+    .telegram-nav-btn {
+        padding: 2px 8px;
+        font-size: 9px;
+    }
+
+    .telegram-nav-btn svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    .scroll-bottom {
+        right: 12px;
+        bottom: 110px;
+        width: 36px;
+        height: 36px;
+    }
+
+    .scroll-bottom svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .dialog-item .avatar {
+        width: 40px;
+        height: 40px;
+        flex: 0 0 40px;
+    }
+
+    .search-box {
+        padding: 4px 8px;
+    }
+
+    .search-box input {
+        height: 34px;
+        font-size: 14px;
+    }
+
+    .icon-btn {
+        width: 34px;
+        height: 34px;
+        flex: 0 0 34px;
+    }
+
+    .message-item {
+        max-width: 88%;
+    }
+
+    .profile-chip strong {
+        font-size: 13px;
+    }
+
+    .profile-chip small {
+        font-size: 10px;
+    }
+
+    .avatar {
+        width: 34px;
+        height: 34px;
+        flex: 0 0 34px;
+        font-size: 12px;
+    }
+
+    .section-title {
+        padding: 4px 10px 2px;
+        font-size: 10px;
+    }
+
+    .section-title small {
+        min-width: 16px;
+        height: 16px;
+        font-size: 9px;
+        line-height: 16px;
+        padding: 0 5px;
+    }
+
+    .dialog-content strong {
+        font-size: 13px;
+    }
+
+    .dialog-content small {
+        font-size: 11px;
+    }
 }
 
-.media-btn {
-    display: grid;
-    width: 46px;
-    height: 46px;
-    place-items: center;
-    border: 0;
-    border-radius: 8px;
-    color: var(--muted);
-    background: var(--panel-soft);
-    transition: all 0.15s ease;
+@media (max-width: 480px) {
+    .message-item {
+        max-width: 92%;
+    }
+
+    .message-actions {
+        opacity: 1;
+    }
+
+    .sidebar-top {
+        min-height: 42px;
+        padding: 3px 6px;
+    }
+
+    .chat-top {
+        min-height: 42px;
+        padding: 3px 6px;
+    }
+
+    .chat-person strong {
+        font-size: 13px;
+    }
+
+    .chat-person small {
+        font-size: 10px;
+    }
+
+    .messages-container {
+        padding: 6px 8px;
+        gap: 3px;
+    }
+
+    .telegram-input-bar {
+        padding: 3px 6px;
+        gap: 3px;
+    }
+
+    .telegram-circle-btn {
+        width: 30px;
+        height: 30px;
+    }
+
+    .telegram-circle-btn svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    .telegram-input-box {
+        height: 30px;
+        padding: 0 8px;
+    }
+
+    .telegram-input-box input {
+        font-size: 14px;
+    }
+
+    .telegram-nav {
+        padding: 2px 0 3px;
+    }
+
+    .telegram-nav-btn {
+        padding: 1px 4px;
+        font-size: 8px;
+    }
+
+    .telegram-nav-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .scroll-bottom {
+        bottom: 100px;
+        width: 32px;
+        height: 32px;
+        right: 8px;
+    }
+
+    .scroll-bottom svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    .input-footer span:first-child {
+        display: none;
+    }
+
+    .input-footer {
+        padding: 1px 8px 3px;
+        font-size: 10px;
+    }
+
+    .profile-chip strong {
+        font-size: 12px;
+    }
+
+    .profile-chip small {
+        font-size: 9px;
+    }
+
+    .avatar {
+        width: 30px;
+        height: 30px;
+        flex: 0 0 30px;
+        font-size: 11px;
+    }
+
+    .dialog-item .avatar {
+        width: 36px;
+        height: 36px;
+        flex: 0 0 36px;
+        font-size: 12px;
+    }
+
+    .dialog-content strong {
+        font-size: 12px;
+    }
+
+    .dialog-content small {
+        font-size: 10px;
+    }
+
+    .search-box input {
+        height: 28px;
+        font-size: 13px;
+        padding: 0 8px;
+    }
+
+    .icon-btn {
+        width: 28px;
+        height: 28px;
+        flex: 0 0 28px;
+    }
+
+    .section-title {
+        padding: 2px 8px 2px;
+        font-size: 9px;
+    }
+
+    .section-title small {
+        min-width: 14px;
+        height: 14px;
+        font-size: 8px;
+        line-height: 14px;
+        padding: 0 4px;
+    }
+
+    .search-results {
+        margin: 0 8px 4px;
+    }
+
+    .search-result-item {
+        padding: 6px 10px;
+    }
+
+    .search-result-item .avatar {
+        width: 28px;
+        height: 28px;
+        flex: 0 0 28px;
+        font-size: 10px;
+    }
+
+    .modal-card {
+        padding: 16px;
+        margin: 8px;
+    }
+
+    .settings-modal {
+        max-width: 100%;
+    }
+
+    .settings-item {
+        padding: 10px 12px;
+    }
+
+    .settings-icon {
+        font-size: 18px;
+        width: 28px;
+    }
+
+    .settings-label {
+        font-size: 13px;
+    }
+
+    .about-modal {
+        max-width: 100%;
+        margin: 8px;
+    }
+
+    .about-logo {
+        width: 52px;
+        height: 52px;
+        font-size: 22px;
+    }
+
+    .about-content h2 {
+        font-size: 20px;
+    }
+
+    .theme-options {
+        flex-direction: column;
+    }
+
+    .msg-style-options {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .bg-options {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .recorder-panel {
+        padding: 4px 8px;
+        gap: 6px;
+    }
+
+    .recorder-timer {
+        font-size: 14px;
+    }
+
+    #waveformCanvas {
+        height: 28px;
+    }
+
+    .video-preview {
+        width: 60px;
+        height: 44px;
+    }
+
+    .voice-message {
+        min-width: 120px;
+    }
+
+    .voice-play-btn {
+        width: 28px;
+        height: 28px;
+    }
+
+    .voice-play-btn svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .voice-waveform {
+        height: 28px;
+    }
+
+    .video-message {
+        max-width: 180px;
+    }
+
+    .video-player {
+        max-height: 200px;
+    }
 }
 
-.media-btn:hover {
-    background: var(--accent);
-    color: #fff;
-}
+/* Для очень маленьких экранов */
+@media (max-width: 380px) {
+    .sidebar-top {
+        min-height: 38px;
+        padding: 2px 4px;
+    }
 
-.media-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
+    .chat-top {
+        min-height: 38px;
+        padding: 2px 4px;
+    }
 
-.media-btn svg {
-    width: 22px;
-    height: 22px;
+    .chat-person strong {
+        font-size: 12px;
+    }
+
+    .chat-person small {
+        font-size: 9px;
+    }
+
+    .avatar {
+        width: 26px;
+        height: 26px;
+        flex: 0 0 26px;
+        font-size: 10px;
+    }
+
+    .dialog-item .avatar {
+        width: 32px;
+        height: 32px;
+        flex: 0 0 32px;
+        font-size: 11px;
+    }
+
+    .profile-chip strong {
+        font-size: 11px;
+    }
+
+    .profile-chip small {
+        font-size: 8px;
+    }
+
+    .icon-btn {
+        width: 26px;
+        height: 26px;
+        flex: 0 0 26px;
+    }
+
+    .telegram-circle-btn {
+        width: 26px;
+        height: 26px;
+    }
+
+    .telegram-circle-btn svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .telegram-input-box {
+        height: 26px;
+        padding: 0 6px;
+    }
+
+    .telegram-input-box input {
+        font-size: 13px;
+    }
+
+    .telegram-nav-btn {
+        padding: 1px 2px;
+        font-size: 7px;
+    }
+
+    .telegram-nav-btn svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    .scroll-bottom {
+        bottom: 90px;
+        width: 28px;
+        height: 28px;
+        right: 6px;
+    }
+
+    .scroll-bottom svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .messages-container {
+        padding: 4px 6px;
+        gap: 2px;
+    }
+
+    .message-item {
+        max-width: 95%;
+    }
+
+    .message-bubble {
+        padding: 4px 8px 3px;
+        min-width: 60px;
+    }
+
+    .message-text {
+        font-size: 13px;
+    }
+
+    .search-box {
+        padding: 2px 6px;
+    }
+
+    .search-box input {
+        height: 26px;
+        font-size: 12px;
+        padding: 0 6px;
+    }
+
+    .section-title {
+        padding: 2px 6px 2px;
+        font-size: 8px;
+    }
+
+    .section-title small {
+        min-width: 12px;
+        height: 12px;
+        font-size: 7px;
+        line-height: 12px;
+        padding: 0 3px;
+    }
+
+    .dialog-item {
+        padding: 4px 6px;
+        gap: 6px;
+    }
 }
