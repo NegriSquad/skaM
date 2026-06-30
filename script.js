@@ -54,6 +54,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initNotifications();
     checkIfMobile();
     applySavedSettings();
+    initActionsPanel();
 });
 
 function checkIfMobile() {
@@ -61,7 +62,7 @@ function checkIfMobile() {
 }
 
 function bindElements() {
-    [
+    const ids = [
         "loginScreen", "registerScreen", "mainAppScreen", "loginEmail", "loginPassword",
         "doLoginBtn", "showRegisterBtn", "regEmail", "regUsername", "regNickname",
         "regPassword", "doRegisterBtn", "showLoginFromRegBtn", "globalLogoutBtn",
@@ -80,8 +81,10 @@ function bindElements() {
         "openSettingsFromSidebar", "chatPartnerAvatarBtn", "partnerProfileModal",
         "closePartnerProfileBtn", "partnerChatBtn", "partnerAvatarPreview",
         "partnerPreviewName", "partnerPreviewUsername", "partnerBioDisplay",
-        "partnerUsernameDisplay"
-    ].forEach(id => {
+        "partnerUsernameDisplay", "messageActionsPanel", "closeActionsPanel"
+    ];
+
+    ids.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
             els[id] = el;
@@ -136,16 +139,31 @@ function bindEvents() {
         if (event.target === els.profileModal) closeProfileModal();
     });
 
-    els.searchUserBtn.addEventListener("click", () => searchUserByUsername(els.searchUserInput.value));
-    els.searchUserInput.addEventListener("keydown", event => {
-        if (event.key === "Enter") searchUserByUsername(els.searchUserInput.value);
+    // ===== ИСПРАВЛЕННЫЙ ПОИСК =====
+    els.searchUserBtn.addEventListener("click", function(e) {
+        e.preventDefault();
+        const query = els.searchUserInput.value.trim();
+        if (query.length >= 2) {
+            searchUserByUsername(query);
+        } else {
+            els.searchResults.classList.remove("hidden");
+            els.searchResults.replaceChildren();
+            els.searchResults.appendChild(searchMessage("Введите минимум 2 символа для поиска."));
+        }
     });
-    els.searchUserInput.addEventListener("input", () => {
-        clearTimeout(state.searchTimer);
-        state.searchTimer = setTimeout(() => {
-            if (els.searchUserInput.value.trim().length >= 3) searchUserByUsername(els.searchUserInput.value);
-        }, 350);
+
+    els.searchUserInput.addEventListener("keydown", function(event) {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            const query = this.value.trim();
+            if (query.length >= 2) {
+                searchUserByUsername(query);
+            }
+        }
     });
+
+    // Убираем автоматический поиск при вводе (он мешал)
+    // Оставляем только поиск по Enter или кнопке
 
     if (els.sendBtnTelegram) {
         els.sendBtnTelegram.addEventListener("click", sendOrUpdateMessage);
@@ -231,12 +249,10 @@ function bindEvents() {
         els.navSettingsBtn.addEventListener("click", openSettingsModal);
     }
 
-    // Открытие настроек из боковой панели
     if (els.openSettingsFromSidebar) {
         els.openSettingsFromSidebar.addEventListener("click", openSettingsModal);
     }
 
-    // Открытие профиля собеседника
     if (els.chatPartnerAvatarBtn) {
         els.chatPartnerAvatarBtn.addEventListener("click", () => {
             if (state.activePartner) {
@@ -245,7 +261,6 @@ function bindEvents() {
         });
     }
 
-    // Закрытие профиля собеседника
     if (els.closePartnerProfileBtn) {
         els.closePartnerProfileBtn.addEventListener("click", () => {
             if (els.partnerProfileModal) els.partnerProfileModal.classList.add("hidden");
@@ -271,7 +286,6 @@ function bindEvents() {
     if (els.cancelVideoBtn) els.cancelVideoBtn.addEventListener("click", cancelRecording);
     if (els.sendVideoBtn) els.sendVideoBtn.addEventListener("click", sendVideoRecording);
 
-    // Настройки - основное окно
     if (els.closeSettingsBtn) {
         els.closeSettingsBtn.addEventListener("click", () => {
             if (els.settingsModal) els.settingsModal.classList.add("hidden");
@@ -300,10 +314,7 @@ function bindEvents() {
         });
     }
 
-    // ============================================
-    // ОБРАБОТЧИКИ ПУНКТОВ МЕНЮ НАСТРОЕК
-    // ============================================
-
+    // Настройки
     document.querySelector('[data-setting="folders"]')?.addEventListener("click", () => {
         closeAllModals();
         document.getElementById('foldersSettings')?.classList.remove('hidden');
@@ -352,10 +363,7 @@ function bindEvents() {
         if (els.aboutModal) els.aboutModal.classList.remove("hidden");
     });
 
-    // ============================================
-    // ОБРАБОТЧИКИ КНОПОК НАЗАД В СТРАНИЦАХ НАСТРОЕК
-    // ============================================
-
+    // Назад в настройках
     document.getElementById('backFromAppearance')?.addEventListener('click', () => {
         document.getElementById('appearanceSettings')?.classList.add('hidden');
         document.getElementById('settingsModal')?.classList.remove('hidden');
@@ -396,10 +404,7 @@ function bindEvents() {
         document.getElementById('settingsModal')?.classList.remove('hidden');
     });
 
-    // ============================================
-    // ОБРАБОТЧИКИ КНОПОК ЗАКРЫТИЯ СТРАНИЦ НАСТРОЕК
-    // ============================================
-
+    // Закрытие страниц настроек
     document.getElementById('closeAppearanceBtn')?.addEventListener('click', () => {
         document.getElementById('appearanceSettings')?.classList.add('hidden');
     });
@@ -432,10 +437,7 @@ function bindEvents() {
         document.getElementById('foldersSettings')?.classList.add('hidden');
     });
 
-    // ============================================
-    // ДОПОЛНИТЕЛЬНЫЕ ОБРАБОТЧИКИ ДЛЯ КНОПОК В НАСТРОЙКАХ
-    // ============================================
-
+    // Дополнительные кнопки в настройках
     document.getElementById('changePasswordBtn')?.addEventListener('click', () => {
         const email = state.user?.email;
         if (!email) {
@@ -497,7 +499,7 @@ function bindEvents() {
     });
 
     document.querySelector('[data-help="faq"]')?.addEventListener('click', () => {
-        alert('❓ Часто задаваемые вопросы\n\nQ: Как найти пользователя?\nA: Используйте поиск по @username в верхней части чатов.\n\nQ: Как удалить сообщение?\nA: Наведите на сообщение и нажмите "Удалить".');
+        alert('❓ Часто задаваемые вопросы\n\nQ: Как найти пользователя?\nA: Используйте поиск по @username в верхней части чатов.\n\nQ: Как удалить сообщение?\nA: Нажмите на сообщение и выберите "Удалить у себя" или "Удалить везде".');
     });
 
     document.querySelector('[data-help="guides"]')?.addEventListener('click', () => {
@@ -513,562 +515,201 @@ function bindEvents() {
     });
 }
 
-// ============================================
-// ОТКРЫТИЕ ПРОФИЛЯ СОБЕСЕДНИКА
-// ============================================
+// ===== ПАНЕЛЬ ДЕЙСТВИЙ =====
+let selectedMessageId = null;
+let selectedMessageData = null;
+let selectedMessageElement = null;
+let actionsOverlay = null;
 
-function openPartnerProfile(partner) {
-    if (!partner) return;
+function initActionsPanel() {
+    actionsOverlay = document.createElement('div');
+    actionsOverlay.className = 'actions-overlay';
+    actionsOverlay.id = 'actionsOverlay';
+    document.body.appendChild(actionsOverlay);
 
-    const modal = els.partnerProfileModal;
-    if (!modal) return;
-
-    const avatar = els.partnerAvatarPreview;
-    setAvatar(avatar, partner.nickname || partner.username, partner.avatarUrl);
-
-    if (els.partnerPreviewName) {
-        els.partnerPreviewName.textContent = partner.nickname || partner.username || 'Пользователь';
-    }
-    if (els.partnerPreviewUsername) {
-        els.partnerPreviewUsername.textContent = `@${partner.username || 'username'}`;
-    }
-    if (els.partnerUsernameDisplay) {
-        els.partnerUsernameDisplay.textContent = `@${partner.username || 'username'}`;
-    }
-    if (els.partnerBioDisplay) {
-        els.partnerBioDisplay.textContent = partner.bio || '—';
-    }
-
-    if (els.partnerChatBtn) {
-        els.partnerChatBtn.dataset.partnerId = partner.uid;
-        els.partnerChatBtn.dataset.chatId = state.activeChatId;
-    }
-
-    modal.classList.remove('hidden');
-}
-
-// ============================================
-// ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ НАСТРОЕК
-// ============================================
-
-function closeAllModals() {
-    const modals = document.querySelectorAll('.modal:not(.hidden)');
-    modals.forEach(modal => {
-        if (modal.id !== 'profileModal' && modal.id !== 'settingsModal' && modal.id !== 'partnerProfileModal') {
-            modal.classList.add('hidden');
-        }
-    });
-}
-
-function applySavedSettings() {
-    const savedBg = localStorage.getItem('localgram-chat-bg');
-    if (savedBg) {
-        state.currentBg = savedBg;
-        applyChatBackground(savedBg);
-    }
-
-    const savedStyle = localStorage.getItem('localgram-msg-style');
-    if (savedStyle) {
-        state.currentMsgStyle = savedStyle;
-    }
-
-    const savedAccent = localStorage.getItem('localgram-accent-color');
-    if (savedAccent) {
-        state.currentAccentColor = savedAccent;
-        applyAccentColor(savedAccent);
-    }
-}
-
-function initNotificationToggles() {
-    const pushToggle = document.getElementById('pushNotificationsToggle');
-    const soundToggle = document.getElementById('soundNotificationsToggle');
-    const previewToggle = document.getElementById('previewNotificationsToggle');
-
-    const savedPush = localStorage.getItem('localgram-push-notifications');
-    const savedSound = localStorage.getItem('localgram-sound-notifications');
-    const savedPreview = localStorage.getItem('localgram-preview-notifications');
-
-    if (pushToggle) {
-        pushToggle.checked = savedPush !== 'false';
-        pushToggle.addEventListener('change', () => {
-            localStorage.setItem('localgram-push-notifications', pushToggle.checked);
-            if (pushToggle.checked) {
-                requestNotificationPermission();
-            } else {
-                state.notificationsEnabled = false;
-            }
-        });
-    }
-
-    if (soundToggle) {
-        soundToggle.checked = savedSound !== 'false';
-        soundToggle.addEventListener('change', () => {
-            localStorage.setItem('localgram-sound-notifications', soundToggle.checked);
-        });
-    }
-
-    if (previewToggle) {
-        previewToggle.checked = savedPreview !== 'false';
-        previewToggle.addEventListener('change', () => {
-            localStorage.setItem('localgram-preview-notifications', previewToggle.checked);
-        });
-    }
-}
-
-function initAppearanceSettings() {
-    // Тема
-    const themeOptions = document.querySelectorAll('.theme-option');
-    const currentTheme = document.documentElement.dataset.theme || 'light';
-
-    themeOptions.forEach(option => {
-        option.classList.toggle('active', option.dataset.theme === currentTheme);
-        // Удаляем старые обработчики, чтобы не дублировать
-        option.replaceWith?.(option.cloneNode(true));
-    });
-
-    // Пересоздаём обработчики
-    document.querySelectorAll('.theme-option').forEach(option => {
-        option.addEventListener('click', () => {
-            document.querySelectorAll('.theme-option').forEach(o => o.classList.remove('active'));
-            option.classList.add('active');
-            const theme = option.dataset.theme;
-            if (theme === 'system') {
-                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                applyTheme(prefersDark ? 'dark' : 'light');
-                localStorage.removeItem('localgram-theme');
-            } else {
-                applyTheme(theme);
-                localStorage.setItem('localgram-theme', theme);
-            }
-        });
-    });
-
-    // Фон чата
-    const bgOptions = document.querySelectorAll('.bg-option');
-    const savedBg = localStorage.getItem('localgram-chat-bg') || 'default';
-
-    bgOptions.forEach(option => {
-        option.classList.toggle('active', option.dataset.bg === savedBg);
-        option.replaceWith?.(option.cloneNode(true));
-    });
-
-    document.querySelectorAll('.bg-option').forEach(option => {
-        option.addEventListener('click', () => {
-            document.querySelectorAll('.bg-option').forEach(o => o.classList.remove('active'));
-            option.classList.add('active');
-            const bg = option.dataset.bg;
-            state.currentBg = bg;
-            localStorage.setItem('localgram-chat-bg', bg);
-            applyChatBackground(bg);
-        });
-    });
-
-    // Стиль сообщений
-    const msgStyleOptions = document.querySelectorAll('.msg-style-option');
-    const savedStyle = localStorage.getItem('localgram-msg-style') || 'default';
-
-    msgStyleOptions.forEach(option => {
-        option.classList.toggle('active', option.dataset.style === savedStyle);
-        option.replaceWith?.(option.cloneNode(true));
-    });
-
-    document.querySelectorAll('.msg-style-option').forEach(option => {
-        option.addEventListener('click', () => {
-            document.querySelectorAll('.msg-style-option').forEach(o => o.classList.remove('active'));
-            option.classList.add('active');
-            const style = option.dataset.style;
-            state.currentMsgStyle = style;
-            localStorage.setItem('localgram-msg-style', style);
-        });
-    });
-
-    // Цвет акцента
-    const accentOptions = document.querySelectorAll('.accent-option');
-    const savedAccent = localStorage.getItem('localgram-accent-color') || '#2aabee';
-
-    accentOptions.forEach(option => {
-        option.classList.toggle('active', option.dataset.color === savedAccent);
-        option.replaceWith?.(option.cloneNode(true));
-    });
-
-    document.querySelectorAll('.accent-option').forEach(option => {
-        option.addEventListener('click', () => {
-            document.querySelectorAll('.accent-option').forEach(o => o.classList.remove('active'));
-            option.classList.add('active');
-            const color = option.dataset.color;
-            state.currentAccentColor = color;
-            localStorage.setItem('localgram-accent-color', color);
-            applyAccentColor(color);
-        });
-    });
-
-    // Кнопка сброса
-    document.getElementById('resetAppearanceBtn')?.addEventListener('click', () => {
-        if (confirm('Сбросить все настройки оформления?')) {
-            localStorage.removeItem('localgram-chat-bg');
-            localStorage.removeItem('localgram-msg-style');
-            localStorage.removeItem('localgram-accent-color');
-            localStorage.removeItem('localgram-theme');
-
-            state.currentBg = 'default';
-            state.currentMsgStyle = 'default';
-            state.currentAccentColor = '#2aabee';
-
-            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-            applyTheme(prefersDark ? 'dark' : 'light');
-            applyChatBackground('default');
-            applyAccentColor('#2aabee');
-
-            document.querySelectorAll('.theme-option').forEach(o => {
-                o.classList.toggle('active', o.dataset.theme === (prefersDark ? 'dark' : 'light'));
-            });
-            document.querySelectorAll('.bg-option').forEach(o => {
-                o.classList.toggle('active', o.dataset.bg === 'default');
-            });
-            document.querySelectorAll('.msg-style-option').forEach(o => {
-                o.classList.toggle('active', o.dataset.style === 'default');
-            });
-            document.querySelectorAll('.accent-option').forEach(o => {
-                o.classList.toggle('active', o.dataset.color === '#2aabee');
-            });
-
-            alert('Настройки сброшены!');
-        }
-    });
-}
-
-function applyChatBackground(bg) {
-    const chatPanel = document.querySelector('.chat-panel');
-    if (!chatPanel) return;
-
-    const bgMap = {
-        'default': 'var(--chat-bg)',
-        'gradient1': 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        'gradient2': 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-        'gradient3': 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-        'gradient4': 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
-        'gradient5': 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)'
-    };
-
-    chatPanel.style.background = bgMap[bg] || 'var(--chat-bg)';
-}
-
-function applyMessageStyleToElement(element, style) {
-    if (!element) return;
-    
-    const styleMap = {
-        'default': { borderRadius: '8px 8px 8px 2px', background: 'var(--bubble)', color: 'var(--text)', boxShadow: '0 1px 2px rgba(40, 62, 82, 0.12)' },
-        'rounded': { borderRadius: '16px', background: 'var(--bubble)', color: 'var(--text)', boxShadow: '0 1px 2px rgba(40, 62, 82, 0.12)' },
-        'gradient': { borderRadius: '8px 8px 8px 2px', background: 'linear-gradient(135deg, var(--accent), #7b61ff)', color: 'white', boxShadow: '0 2px 8px rgba(42, 171, 238, 0.3)' },
-        'neumorphic': { borderRadius: '16px', background: 'var(--panel)', color: 'var(--text)', boxShadow: '4px 4px 8px rgba(0,0,0,0.1), -4px -4px 8px rgba(255,255,255,0.1)' }
-    };
-
-    const styleConfig = styleMap[style] || styleMap['default'];
-    Object.assign(element.style, styleConfig);
-    
-    // Для градиентного стиля обновляем цвет текста
-    if (style === 'gradient') {
-        element.style.color = 'white';
-    } else {
-        element.style.color = 'var(--text)';
-    }
-}
-
-function applyAccentColor(color) {
-    document.documentElement.style.setProperty('--accent', color);
-    document.documentElement.style.setProperty('--accent-dark', color);
-
-    document.querySelectorAll('.primary-btn, .icon-btn.accent, .send-button, .telegram-circle-btn.blue').forEach(el => {
-        el.style.background = color;
-    });
-    
-    // Обновляем стиль сообщений если он градиентный
-    if (state.currentMsgStyle === 'gradient') {
-        document.querySelectorAll('.message-bubble:not(.own-message .message-bubble)').forEach(bubble => {
-            bubble.style.background = `linear-gradient(135deg, ${color}, #7b61ff)`;
-        });
-    }
-}
-
-function initLanguageSettings() {
-    const langOptions = document.querySelectorAll('.language-option');
-    const currentLang = localStorage.getItem('localgram-language') || 'ru';
-
-    langOptions.forEach(option => {
-        option.classList.toggle('active', option.dataset.lang === currentLang);
-        option.replaceWith?.(option.cloneNode(true));
-    });
-
-    document.querySelectorAll('.language-option').forEach(option => {
-        option.addEventListener('click', () => {
-            document.querySelectorAll('.language-option').forEach(o => o.classList.remove('active'));
-            option.classList.add('active');
-            const lang = option.dataset.lang;
-            localStorage.setItem('localgram-language', lang);
-            alert(`Язык изменён на ${option.querySelector('.lang-name')?.textContent || lang}`);
-        });
-    });
-}
-
-function requestNotificationPermission() {
-    if (!('Notification' in window)) {
-        alert('Ваш браузер не поддерживает уведомления');
-        return;
-    }
-
-    if (Notification.permission === 'granted') {
-        state.notificationsEnabled = true;
-        alert('✅ Уведомления уже включены');
-        return;
-    }
-
-    if (Notification.permission === 'denied') {
-        alert('❌ Уведомления заблокированы в браузере. Разрешите их в настройках браузера.');
-        return;
-    }
-
-    Notification.requestPermission().then(permission => {
-        if (permission === 'granted') {
-            state.notificationsEnabled = true;
-            subscribeToPush();
-            alert('✅ Уведомления включены!');
-        } else {
-            alert('❌ Уведомления отключены');
-        }
-    });
-}
-
-// ============================================
-// УВЕДОМЛЕНИЯ (исправлены ошибки permission_denied)
-// ============================================
-
-function initNotifications() {
-    if (!('Notification' in window)) {
-        console.log('Браузер не поддерживает уведомления');
-        return;
-    }
-
-    if (Notification.permission === 'default') {
-        document.addEventListener('click', requestNotificationPermission, { once: true });
-    } else if (Notification.permission === 'granted') {
-        state.notificationsEnabled = true;
-        // Не пытаемся зарегистрировать Service Worker в локальном окружении
-        if (window.location.protocol === 'https:' || window.location.hostname === 'localhost') {
-            subscribeToPush();
-        }
-    }
-}
-
-async function registerServiceWorker() {
-    // Не регистрируем в локальном окружении (file://)
-    if (window.location.protocol === 'file:') {
-        console.log('Service Worker не поддерживается в локальном окружении');
-        return;
-    }
-    
-    try {
-        const registration = await navigator.serviceWorker.register('/sw.js', {
-            scope: '/'
-        });
-        console.log('Service Worker зарегистрирован:', registration);
-
-        const subscription = await registration.pushManager.getSubscription();
-        if (subscription) {
-            state.pushSubscription = subscription;
-            savePushSubscription(subscription);
-        }
-    } catch (error) {
-        console.log('Service Worker регистрация не удалась:', error);
-    }
-}
-
-async function subscribeToPush() {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
-    if (window.location.protocol === 'file:') return;
-
-    try {
-        const registration = await navigator.serviceWorker.ready;
-        let subscription = await registration.pushManager.getSubscription();
-
-        if (!subscription) {
-            const publicKey = await getPublicKey();
-            if (!publicKey) {
-                console.log('Публичный ключ не получен');
+    document.querySelectorAll('.action-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const action = this.dataset.action;
+            
+            if (!selectedMessageId || !selectedMessageData) {
+                closeMessageActions();
                 return;
             }
-            subscription = await registration.pushManager.subscribe({
-                userVisibleOnly: true,
-                applicationServerKey: publicKey
-            });
-        }
-
-        state.pushSubscription = subscription;
-        await savePushSubscription(subscription);
-        console.log('Подписка на push создана');
-    } catch (error) {
-        console.log('Ошибка подписки на push:', error);
-    }
-}
-
-async function getPublicKey() {
-    const vapidPublicKey = 'BEl62iUYgUwfxN8vBk4qEQPp-1_N9ngnDxjFQ0lGJPuJ0ClzLwqLcM97JtWrXQnQ9JmYb6XJtP6h5t5hr5t5hr5t5hr5t5hr5t5hr5t5hr5t5';
-    return urlBase64ToUint8Array(vapidPublicKey);
-}
-
-function urlBase64ToUint8Array(base64String) {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-    for (let i = 0; i < rawData.length; ++i) {
-        outputArray[i] = rawData.charCodeAt(i);
-    }
-    return outputArray;
-}
-
-async function savePushSubscription(subscription) {
-    if (!state.user) return;
-    
-    // Пытаемся сохранить, но игнорируем ошибки permission_denied
-    try {
-        const subscriptionData = {
-            endpoint: subscription.endpoint,
-            keys: {
-                p256dh: subscription.toJSON().keys.p256dh,
-                auth: subscription.toJSON().keys.auth
-            },
-            userAgent: navigator.userAgent,
-            isMobile: state.isMobile,
-            updatedAt: Date.now()
-        };
-
-        await db.ref(`push_subscriptions/${state.user.uid}/${subscription.endpoint}`).set(subscriptionData);
-    } catch (error) {
-        // Игнорируем ошибки permission_denied для уведомлений
-        if (error.message && error.message.includes('permission_denied')) {
-            console.log('Нет прав для сохранения подписки push');
-        } else {
-            console.log('Ошибка сохранения подписки:', error);
-        }
-    }
-}
-
-async function sendPushNotification(chatId, partnerId, message, partnerName) {
-    try {
-        const notificationData = {
-            chatId: chatId,
-            partnerId: partnerId,
-            message: message,
-            partnerName: partnerName,
-            timestamp: Date.now(),
-            type: 'message'
-        };
-
-        // Пытаемся сохранить уведомление, но игнорируем ошибки permission_denied
-        try {
-            await db.ref(`notifications/${partnerId}/${chatId}`).update({
-                lastMessage: message,
-                timestamp: Date.now(),
-                read: false
-            });
-        } catch (error) {
-            if (error.message && error.message.includes('permission_denied')) {
-                console.log('Нет прав для сохранения уведомления');
-            } else {
-                throw error;
-            }
-        }
-
-        showBrowserNotification(partnerName, message, chatId);
-        playNotificationSound();
-
-    } catch (error) {
-        console.log('Ошибка отправки уведомления:', error);
-    }
-}
-
-function showBrowserNotification(title, body, chatId) {
-    if (!state.notificationsEnabled && Notification.permission !== 'granted') return;
-    if (!('Notification' in window)) return;
-
-    if (state.activeChatId === chatId && document.hasFocus()) return;
-
-    const now = Date.now();
-    if (now - state.lastNotificationTimestamp < 3000) return;
-    state.lastNotificationTimestamp = now;
-
-    try {
-        const notification = new Notification(`💬 ${title}`, {
-            body: body,
-            icon: '/favicon.ico',
-            badge: '/badge-icon.png',
-            vibrate: [200, 100, 200],
-            silent: true,
-            tag: chatId,
-            requireInteraction: false,
-            data: {
-                chatId: chatId,
-                url: window.location.href
+            
+            switch(action) {
+                case 'edit':
+                    beginEditMessage(selectedMessageData);
+                    closeMessageActions();
+                    break;
+                    
+                case 'reply':
+                    alert('Функция "Ответить" будет добавлена позже');
+                    closeMessageActions();
+                    break;
+                    
+                case 'forward':
+                    alert('Функция "Переслать" будет добавлена позже');
+                    closeMessageActions();
+                    break;
+                    
+                case 'markUnread':
+                    closeMessageActions();
+                    break;
+                    
+                case 'copy':
+                    if (selectedMessageData.text) {
+                        navigator.clipboard.writeText(selectedMessageData.text).then(() => {
+                            showToast('Текст скопирован');
+                        }).catch(() => {
+                            const textarea = document.createElement('textarea');
+                            textarea.value = selectedMessageData.text;
+                            document.body.appendChild(textarea);
+                            textarea.select();
+                            document.execCommand('copy');
+                            document.body.removeChild(textarea);
+                            showToast('Текст скопирован');
+                        });
+                    }
+                    closeMessageActions();
+                    break;
+                    
+                case 'select':
+                    closeMessageActions();
+                    break;
+                    
+                case 'deleteForMe':
+                    deleteMessageForMe(selectedMessageId);
+                    closeMessageActions();
+                    break;
+                    
+                case 'deleteForAll':
+                    if (confirm('Удалить это сообщение для всех?')) {
+                        deleteMessageForAll(selectedMessageId);
+                    }
+                    closeMessageActions();
+                    break;
             }
         });
+    });
 
-        notification.onclick = (event) => {
-            event.preventDefault();
-            window.focus();
-            if (chatId) {
-                const partner = state.activePartner;
-                if (partner && partner.uid) {
-                    openChat(chatId, partner);
-                }
-            }
-            notification.close();
-        };
-
-        setTimeout(() => notification.close(), 8000);
-    } catch (error) {
-        console.log('Ошибка показа уведомления:', error);
+    actionsOverlay.addEventListener('click', closeMessageActions);
+    if (els.closeActionsPanel) {
+        els.closeActionsPanel.addEventListener('click', closeMessageActions);
     }
 }
 
-function playNotificationSound() {
+function openMessageActions(messageId, messageData, element) {
+    selectedMessageId = messageId;
+    selectedMessageData = messageData;
+    selectedMessageElement = element;
+    
+    const panel = els.messageActionsPanel;
+    if (!panel) return;
+    
+    const editBtn = panel.querySelector('[data-action="edit"]');
+    const copyBtn = panel.querySelector('[data-action="copy"]');
+    const deleteForMeBtn = panel.querySelector('[data-action="deleteForMe"]');
+    const deleteForAllBtn = panel.querySelector('[data-action="deleteForAll"]');
+    const replyBtn = panel.querySelector('[data-action="reply"]');
+    const forwardBtn = panel.querySelector('[data-action="forward"]');
+    const markUnreadBtn = panel.querySelector('[data-action="markUnread"]');
+    const selectBtn = panel.querySelector('[data-action="select"]');
+    
+    const isOwn = messageData.senderId === state.user?.uid;
+    const isText = !messageData.voiceData && !messageData.videoData;
+    const isDeleted = messageData.deleted === true;
+    
+    if (isOwn && isText && !isDeleted) {
+        editBtn.style.display = 'flex';
+    } else {
+        editBtn.style.display = 'none';
+    }
+    
+    if (isText && !isDeleted && messageData.text) {
+        copyBtn.style.display = 'flex';
+    } else {
+        copyBtn.style.display = 'none';
+    }
+    
+    if (isOwn && !isDeleted) {
+        deleteForMeBtn.style.display = 'flex';
+    } else {
+        deleteForMeBtn.style.display = 'none';
+    }
+    
+    if (isOwn && !isDeleted) {
+        deleteForAllBtn.style.display = 'flex';
+    } else {
+        deleteForAllBtn.style.display = 'none';
+    }
+    
+    replyBtn.style.display = 'flex';
+    forwardBtn.style.display = 'flex';
+    markUnreadBtn.style.display = 'flex';
+    selectBtn.style.display = 'flex';
+    
+    panel.classList.add('visible');
+    if (actionsOverlay) actionsOverlay.classList.add('visible');
+}
+
+function closeMessageActions() {
+    const panel = els.messageActionsPanel;
+    if (panel) panel.classList.remove('visible');
+    if (actionsOverlay) actionsOverlay.classList.remove('visible');
+    selectedMessageId = null;
+    selectedMessageData = null;
+    selectedMessageElement = null;
+}
+
+// ===== УДАЛЕНИЕ СООБЩЕНИЙ =====
+
+async function deleteMessageForMe(messageId) {
+    if (!state.activeChatId) return;
+    
     try {
-        const audioCtx = new(window.AudioContext || window.webkitAudioContext)();
-        const oscillator = audioCtx.createOscillator();
-        const gainNode = audioCtx.createGain();
-
-        oscillator.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-
-        oscillator.frequency.value = 800;
-        oscillator.type = 'sine';
-
-        gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-
-        oscillator.start(audioCtx.currentTime);
-        oscillator.stop(audioCtx.currentTime + 0.3);
-
-        setTimeout(() => {
-            const osc2 = audioCtx.createOscillator();
-            const gain2 = audioCtx.createGain();
-            osc2.connect(gain2);
-            gain2.connect(audioCtx.destination);
-            osc2.frequency.value = 1000;
-            osc2.type = 'sine';
-            gain2.gain.setValueAtTime(0.2, audioCtx.currentTime);
-            gain2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
-            osc2.start(audioCtx.currentTime);
-            osc2.stop(audioCtx.currentTime + 0.15);
-        }, 150);
-
+        await db.ref(`private_messages/${state.activeChatId}/${messageId}/deletedFor/${state.user.uid}`).set(true);
+        await syncLastMessageAfterDelete();
+        showToast('Сообщение удалено у вас');
     } catch (error) {
-        console.log('Звук уведомления не воспроизведен');
+        console.error('Delete for me error:', error);
+        alert('Не удалось удалить сообщение');
     }
 }
 
-// ============================================
-// АВТОРИЗАЦИЯ И АУТЕНТИФИКАЦИЯ
-// ============================================
+async function deleteMessageForAll(messageId) {
+    if (!state.activeChatId) return;
+    
+    try {
+        await db.ref(`private_messages/${state.activeChatId}/${messageId}`).remove();
+        await syncLastMessageAfterDelete();
+        showToast('Сообщение удалено для всех');
+    } catch (error) {
+        console.error('Delete for all error:', error);
+        alert('Не удалось удалить сообщение для всех');
+    }
+}
+
+function showToast(text) {
+    const existing = document.querySelector('.toast-notification');
+    if (existing) existing.remove();
+    
+    const toast = document.createElement('div');
+    toast.className = 'toast-notification';
+    toast.textContent = text;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.classList.add('show');
+    }, 10);
+    
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 2000);
+}
+
+// ===== АВТОРИЗАЦИЯ =====
 
 async function handleAuthState(user) {
     if (!user) {
@@ -1124,7 +765,6 @@ function resetSession() {
     state.editingMessageId = null;
     state.selectedAvatarDataUrl = null;
     if (els.mainAppScreen) els.mainAppScreen.classList.add("hidden");
-
     document.title = 'Localgram';
     if (navigator.clearAppBadge) {
         navigator.clearAppBadge().catch(() => {});
@@ -1195,9 +835,7 @@ async function logout() {
     await auth.signOut();
 }
 
-// ============================================
-// ПРОФИЛЬ
-// ============================================
+// ===== ПРОФИЛЬ =====
 
 function renderCurrentProfile() {
     const profile = state.profile || {};
@@ -1299,9 +937,7 @@ document.addEventListener("input", event => {
     }
 });
 
-// ============================================
-// ДИАЛОГИ И СООБЩЕНИЯ (ИСПРАВЛЕН ПОИСК)
-// ============================================
+// ===== ДИАЛОГИ =====
 
 function listenDialogs() {
     if (state.dialogsListener) state.dialogsListener.ref.off("value", state.dialogsListener.callback);
@@ -1356,103 +992,128 @@ function renderDialogs(chats) {
     });
 }
 
+// ===== ИСПРАВЛЕННЫЙ ПОИСК ПОЛЬЗОВАТЕЛЕЙ =====
+
 async function searchUserByUsername(rawUsername) {
     const username = normalizeUsername(rawUsername);
     els.searchResults.classList.remove("hidden");
     els.searchResults.replaceChildren();
 
-    if (!username || username.length < 3) {
-        els.searchResults.appendChild(searchMessage("Введите минимум 3 символа для поиска."));
+    if (!username || username.length < 2) {
+        els.searchResults.appendChild(searchMessage("Введите минимум 2 символа для поиска."));
         return;
     }
 
     try {
-        // Сначала проверяем, есть ли такой username в индексе
-        const usernameSnap = await db.ref(`usernames/${username}`).once('value');
-        const foundUid = usernameSnap.val();
+        // Получаем всех пользователей из базы
+        const usersRef = db.ref('users');
+        const snapshot = await usersRef.once('value');
+        const users = snapshot.val() || {};
         
-        if (!foundUid || foundUid === state.user.uid) {
-            els.searchResults.appendChild(searchMessage(`Пользователь @${username} не найден.`));
+        let foundUser = null;
+        let foundUid = null;
+        
+        const searchTerm = username.toLowerCase();
+        
+        // Ищем пользователя с частичным совпадением
+        for (const [uid, userData] of Object.entries(users)) {
+            if (uid === state.user?.uid) continue; // Пропускаем себя
+            
+            const userUsername = (userData.username || '').toLowerCase();
+            const userNickname = (userData.nickname || '').toLowerCase();
+            
+            // Проверяем полное совпадение или начало username
+            if (userUsername === searchTerm || 
+                userUsername.startsWith(searchTerm) || 
+                userNickname.includes(searchTerm) ||
+                userUsername.includes(searchTerm)) {
+                foundUser = userData;
+                foundUid = uid;
+                break;
+            }
+        }
+        
+        if (!foundUser) {
+            els.searchResults.appendChild(searchMessage(`Пользователь "${rawUsername}" не найден.`));
             return;
         }
 
-        try {
-            const userSnap = await db.ref(`users/${foundUid}`).once("value");
-            const userData = userSnap.val();
-            
-            if (!userData) {
-                els.searchResults.appendChild(searchMessage("Профиль пользователя недоступен."));
-                return;
-            }
+        // Создаём карточку результата
+        const item = document.createElement("div");
+        item.className = "search-result-item";
 
-            const item = document.createElement("div");
-            item.className = "search-result-item";
+        const avatar = document.createElement("span");
+        avatar.className = "avatar";
+        setAvatar(avatar, foundUser.nickname || foundUser.username, foundUser.avatarUrl);
 
-            const avatar = document.createElement("span");
-            avatar.className = "avatar";
-            setAvatar(avatar, userData.nickname || userData.username, userData.avatarUrl);
+        const text = document.createElement("span");
+        text.className = "search-result-text";
+        text.innerHTML = `
+            <strong>${foundUser.nickname || foundUser.username}</strong>
+            <small>@${foundUser.username}</small>
+        `;
 
-            const text = document.createElement("span");
-            text.className = "search-result-text";
-            text.innerHTML = `<strong></strong><small></small>`;
-            text.querySelector("strong").textContent = userData.nickname || userData.username;
-            text.querySelector("small").textContent = `@${userData.username}`;
+        const button = document.createElement("button");
+        button.className = "small-btn";
+        button.textContent = "Написать";
+        button.addEventListener("click", () => startDialogWith(foundUid, foundUser));
 
-            const button = document.createElement("button");
-            button.className = "small-btn";
-            button.textContent = "Написать";
-            button.addEventListener("click", () => startDialogWith(foundUid, userData));
-
-            item.append(avatar, text, button);
-            els.searchResults.appendChild(item);
-        } catch (userError) {
-            console.error("Error fetching user data:", userError);
-            if (userError.message && userError.message.includes("permission_denied")) {
-                els.searchResults.appendChild(searchMessage("Нет доступа к данным пользователя. Проверьте правила безопасности Firebase."));
-            } else {
-                els.searchResults.appendChild(searchMessage(`Ошибка получения данных: ${userError.message}`));
-            }
-        }
+        item.append(avatar, text, button);
+        els.searchResults.appendChild(item);
+        
     } catch (error) {
         console.error("Search error:", error);
-        if (error.message && error.message.includes("permission_denied")) {
-            els.searchResults.appendChild(searchMessage("Нет доступа к данным. Проверьте правила безопасности Firebase."));
-        } else {
-            els.searchResults.appendChild(searchMessage(`Ошибка поиска: ${error.message}`));
-        }
+        els.searchResults.appendChild(searchMessage(`Ошибка поиска: ${error.message}`));
     }
 }
 
 async function startDialogWith(uid, userData) {
+    if (!state.user) {
+        alert("Вы не авторизованы");
+        return;
+    }
+    
     const chatId = [state.user.uid, uid].sort().join("_");
     const now = Date.now();
-    const ownRef = db.ref(`user_chats/${state.user.uid}/${chatId}`);
-    const exists = (await ownRef.once("value")).exists();
+    
+    try {
+        const ownRef = db.ref(`user_chats/${state.user.uid}/${chatId}`);
+        const exists = (await ownRef.once("value")).exists();
 
-    if (!exists) {
-        await ownRef.set({
-            partnerId: uid,
-            partnerName: userData.nickname,
-            partnerUsername: userData.username,
-            partnerAvatarUrl: userData.avatarUrl || "",
-            partnerBio: userData.bio || "",
-            lastMessage: "",
-            lastTimestamp: now
+        if (!exists) {
+            await ownRef.set({
+                partnerId: uid,
+                partnerName: userData.nickname || userData.username,
+                partnerUsername: userData.username,
+                partnerAvatarUrl: userData.avatarUrl || "",
+                partnerBio: userData.bio || "",
+                lastMessage: "",
+                lastTimestamp: now
+            });
+            await db.ref(`user_chats/${uid}/${chatId}`).set({
+                partnerId: state.user.uid,
+                partnerName: state.profile?.nickname || state.profile?.username || "Пользователь",
+                partnerUsername: state.profile?.username || "username",
+                partnerAvatarUrl: state.profile?.avatarUrl || "",
+                partnerBio: state.profile?.bio || "",
+                lastMessage: "",
+                lastTimestamp: now
+            });
+        }
+
+        els.searchUserInput.value = "";
+        els.searchResults.classList.add("hidden");
+        openChat(chatId, { 
+            uid, 
+            nickname: userData.nickname || userData.username, 
+            username: userData.username, 
+            avatarUrl: userData.avatarUrl || "", 
+            bio: userData.bio || "" 
         });
-        await db.ref(`user_chats/${uid}/${chatId}`).set({
-            partnerId: state.user.uid,
-            partnerName: state.profile.nickname,
-            partnerUsername: state.profile.username,
-            partnerAvatarUrl: state.profile.avatarUrl || "",
-            partnerBio: state.profile.bio || "",
-            lastMessage: "",
-            lastTimestamp: now
-        });
+    } catch (error) {
+        console.error("Start dialog error:", error);
+        alert(`Не удалось начать диалог: ${error.message}`);
     }
-
-    els.searchUserInput.value = "";
-    els.searchResults.classList.add("hidden");
-    openChat(chatId, { uid, nickname: userData.nickname, username: userData.username, avatarUrl: userData.avatarUrl || "", bio: userData.bio || "" });
 }
 
 function openChat(chatId, partner) {
@@ -1489,7 +1150,6 @@ function openChat(chatId, partner) {
 
 function markNotificationsRead(chatId) {
     if (!state.user) return;
-    
     try {
         db.ref(`notifications/${state.user.uid}/${chatId}`).update({
             read: true
@@ -1553,10 +1213,16 @@ function createMessageNode(message) {
     const item = document.createElement("article");
     item.className = `message-item ${isOwn ? "own-message" : ""}`;
 
+    item.addEventListener('click', function(e) {
+        if (e.target.closest('.voice-play-btn') || e.target.closest('.video-player')) {
+            return;
+        }
+        openMessageActions(message.id, message, item);
+    });
+
     const bubble = document.createElement("div");
     bubble.className = "message-bubble";
 
-    // Если сообщение удалено
     if (isDeleted) {
         const text = document.createElement("p");
         text.className = "message-text muted-text";
@@ -1575,7 +1241,6 @@ function createMessageNode(message) {
         bubble.appendChild(text);
     }
 
-    // Применяем стиль к сообщению (только если не удалено)
     if (!isDeleted && state.currentMsgStyle) {
         applyMessageStyleToElement(bubble, state.currentMsgStyle);
     }
@@ -1586,24 +1251,6 @@ function createMessageNode(message) {
     const time = document.createElement("time");
     time.textContent = `${formatShortTime(message.timestamp)}${message.editedAt ? " · изменено" : ""}`;
     meta.appendChild(time);
-
-    // Кнопки действий только если сообщение не удалено и принадлежит пользователю
-    if (isOwn && !isDeleted) {
-        const actions = document.createElement("span");
-        actions.className = "message-actions";
-
-        if (!message.voiceData && !message.videoData) {
-            const editBtn = messageAction("Изменить", "edit");
-            editBtn.addEventListener("click", () => beginEditMessage(message));
-            actions.appendChild(editBtn);
-        }
-
-        const deleteBtn = messageAction("Удалить", "delete");
-        deleteBtn.addEventListener("click", () => deleteMessage(message.id));
-        actions.appendChild(deleteBtn);
-
-        meta.appendChild(actions);
-    }
 
     bubble.appendChild(meta);
     item.appendChild(bubble);
@@ -1717,7 +1364,6 @@ async function sendOrUpdateMessage() {
         updateCharCounter();
         await clearTypingIndicator();
 
-        // Отправляем уведомление только если есть права
         if (state.activePartner && state.activePartner.uid) {
             try {
                 const partnerName = state.profile.nickname || state.profile.username || 'Пользователь';
@@ -1731,7 +1377,6 @@ async function sendOrUpdateMessage() {
                     read: false
                 });
             } catch (notifError) {
-                // Игнорируем ошибки уведомлений
                 console.log('Ошибка уведомления:', notifError);
             }
         }
@@ -1746,9 +1391,7 @@ async function sendOrUpdateMessage() {
     }
 }
 
-// ============================================
-// ГОЛОСОВЫЕ И ВИДЕО СООБЩЕНИЯ
-// ============================================
+// ===== ГОЛОСОВЫЕ И ВИДЕО =====
 
 async function startRecording(type) {
     if (!state.activeChatId) {
@@ -2072,9 +1715,7 @@ async function sendVideoRecording() {
     }
 }
 
-// ============================================
-// ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
-// ============================================
+// ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====
 
 async function updateChatLastMessage(text, timestamp = Date.now()) {
     try {
@@ -2119,29 +1760,12 @@ function cancelEditMessage() {
     }
 }
 
-async function deleteMessage(messageId) {
-    if (!confirm("Удалить сообщение?")) return;
-    try {
-        // Помечаем сообщение как удалённое
-        await db.ref(`private_messages/${state.activeChatId}/${messageId}`).update({
-            deleted: true,
-            text: "",
-            deletedAt: Date.now()
-        });
-        // Обновляем последнее сообщение в диалоге
-        await syncLastMessageAfterDelete();
-    } catch (error) {
-        console.error("Delete message error:", error);
-        alert("Не удалось удалить сообщение. Проверьте правила безопасности.");
-    }
-}
-
 async function syncLastMessageAfterDelete() {
     if (!state.activeChatId || !state.activePartner) return;
     try {
         const snap = await db.ref(`private_messages/${state.activeChatId}`).orderByChild("timestamp").limitToLast(30).once("value");
         const messages = Object.values(snap.val() || {})
-            .filter(message => !message.deleted)
+            .filter(message => !message.deleted && (!message.deletedFor || !message.deletedFor[state.user.uid]))
             .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
         const latest = messages[0];
         await updateChatLastMessage(latest ? (latest.text || latest.voiceData ? "🎤 Голосовое" : latest.videoData ? "📹 Видео" : "Сообщение") : "Сообщений нет", latest ? latest.timestamp : Date.now());
@@ -2264,20 +1888,42 @@ async function removeUsernameIndex(username, uid) {
     if (current.val() === uid) await db.ref(`usernames/${username}`).remove();
 }
 
-// ============================================
-// ТЕМА И СТИЛИ
-// ============================================
+function openPartnerProfile(partner) {
+    if (!partner) return;
+
+    const modal = els.partnerProfileModal;
+    if (!modal) return;
+
+    const avatar = els.partnerAvatarPreview;
+    setAvatar(avatar, partner.nickname || partner.username, partner.avatarUrl);
+
+    if (els.partnerPreviewName) {
+        els.partnerPreviewName.textContent = partner.nickname || partner.username || 'Пользователь';
+    }
+    if (els.partnerPreviewUsername) {
+        els.partnerPreviewUsername.textContent = `@${partner.username || 'username'}`;
+    }
+    if (els.partnerUsernameDisplay) {
+        els.partnerUsernameDisplay.textContent = `@${partner.username || 'username'}`;
+    }
+    if (els.partnerBioDisplay) {
+        els.partnerBioDisplay.textContent = partner.bio || '—';
+    }
+
+    if (els.partnerChatBtn) {
+        els.partnerChatBtn.dataset.partnerId = partner.uid;
+        els.partnerChatBtn.dataset.chatId = state.activeChatId;
+    }
+
+    modal.classList.remove('hidden');
+}
+
+// ===== ТЕМА И СТИЛИ =====
 
 function initTheme() {
     const saved = localStorage.getItem("localgram-theme");
     const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
     applyTheme(saved || (prefersDark ? "dark" : "light"));
-}
-
-function toggleTheme() {
-    const nextTheme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
-    applyTheme(nextTheme);
-    localStorage.setItem("localgram-theme", nextTheme);
 }
 
 function applyTheme(theme) {
@@ -2289,6 +1935,538 @@ function openSettingsModal() {
         els.settingsModal.classList.remove("hidden");
     }
 }
+
+function closeAllModals() {
+    const modals = document.querySelectorAll('.modal:not(.hidden)');
+    modals.forEach(modal => {
+        if (modal.id !== 'profileModal' && modal.id !== 'settingsModal' && modal.id !== 'partnerProfileModal') {
+            modal.classList.add('hidden');
+        }
+    });
+}
+
+function applySavedSettings() {
+    const savedBg = localStorage.getItem('localgram-chat-bg');
+    if (savedBg) {
+        state.currentBg = savedBg;
+        applyChatBackground(savedBg);
+    }
+
+    const savedStyle = localStorage.getItem('localgram-msg-style');
+    if (savedStyle) {
+        state.currentMsgStyle = savedStyle;
+    }
+
+    const savedAccent = localStorage.getItem('localgram-accent-color');
+    if (savedAccent) {
+        state.currentAccentColor = savedAccent;
+        applyAccentColor(savedAccent);
+    }
+}
+
+function applyChatBackground(bg) {
+    const chatPanel = document.querySelector('.chat-panel');
+    if (!chatPanel) return;
+
+    const bgMap = {
+        'default': 'var(--chat-bg)',
+        'gradient1': 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        'gradient2': 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+        'gradient3': 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+        'gradient4': 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+        'gradient5': 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)'
+    };
+
+    chatPanel.style.background = bgMap[bg] || 'var(--chat-bg)';
+}
+
+function applyMessageStyleToElement(element, style) {
+    if (!element) return;
+    
+    const styleMap = {
+        'default': { borderRadius: '12px 12px 12px 2px', background: 'var(--bubble)', color: 'var(--text)', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' },
+        'rounded': { borderRadius: '16px', background: 'var(--bubble)', color: 'var(--text)', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' },
+        'gradient': { borderRadius: '12px 12px 12px 2px', background: 'linear-gradient(135deg, var(--accent), #7b61ff)', color: 'white', boxShadow: '0 2px 8px rgba(42, 171, 238, 0.3)' },
+        'neumorphic': { borderRadius: '16px', background: 'var(--panel)', color: 'var(--text)', boxShadow: '4px 4px 8px rgba(0,0,0,0.1), -4px -4px 8px rgba(255,255,255,0.1)' }
+    };
+
+    const styleConfig = styleMap[style] || styleMap['default'];
+    Object.assign(element.style, styleConfig);
+    
+    if (style === 'gradient') {
+        element.style.color = 'white';
+    } else {
+        element.style.color = 'var(--text)';
+    }
+}
+
+function applyAccentColor(color) {
+    document.documentElement.style.setProperty('--accent', color);
+    document.documentElement.style.setProperty('--accent-dark', color);
+}
+
+function initAppearanceSettings() {
+    const themeOptions = document.querySelectorAll('.theme-option');
+    const currentTheme = document.documentElement.dataset.theme || 'light';
+
+    themeOptions.forEach(option => {
+        option.classList.toggle('active', option.dataset.theme === currentTheme);
+        option.replaceWith?.(option.cloneNode(true));
+    });
+
+    document.querySelectorAll('.theme-option').forEach(option => {
+        option.addEventListener('click', () => {
+            document.querySelectorAll('.theme-option').forEach(o => o.classList.remove('active'));
+            option.classList.add('active');
+            const theme = option.dataset.theme;
+            if (theme === 'system') {
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                applyTheme(prefersDark ? 'dark' : 'light');
+                localStorage.removeItem('localgram-theme');
+            } else {
+                applyTheme(theme);
+                localStorage.setItem('localgram-theme', theme);
+            }
+        });
+    });
+
+    const bgOptions = document.querySelectorAll('.bg-option');
+    const savedBg = localStorage.getItem('localgram-chat-bg') || 'default';
+
+    bgOptions.forEach(option => {
+        option.classList.toggle('active', option.dataset.bg === savedBg);
+        option.replaceWith?.(option.cloneNode(true));
+    });
+
+    document.querySelectorAll('.bg-option').forEach(option => {
+        option.addEventListener('click', () => {
+            document.querySelectorAll('.bg-option').forEach(o => o.classList.remove('active'));
+            option.classList.add('active');
+            const bg = option.dataset.bg;
+            state.currentBg = bg;
+            localStorage.setItem('localgram-chat-bg', bg);
+            applyChatBackground(bg);
+        });
+    });
+
+    const msgStyleOptions = document.querySelectorAll('.msg-style-option');
+    const savedStyle = localStorage.getItem('localgram-msg-style') || 'default';
+
+    msgStyleOptions.forEach(option => {
+        option.classList.toggle('active', option.dataset.style === savedStyle);
+        option.replaceWith?.(option.cloneNode(true));
+    });
+
+    document.querySelectorAll('.msg-style-option').forEach(option => {
+        option.addEventListener('click', () => {
+            document.querySelectorAll('.msg-style-option').forEach(o => o.classList.remove('active'));
+            option.classList.add('active');
+            const style = option.dataset.style;
+            state.currentMsgStyle = style;
+            localStorage.setItem('localgram-msg-style', style);
+        });
+    });
+
+    const accentOptions = document.querySelectorAll('.accent-option');
+    const savedAccent = localStorage.getItem('localgram-accent-color') || '#2aabee';
+
+    accentOptions.forEach(option => {
+        option.classList.toggle('active', option.dataset.color === savedAccent);
+        option.replaceWith?.(option.cloneNode(true));
+    });
+
+    document.querySelectorAll('.accent-option').forEach(option => {
+        option.addEventListener('click', () => {
+            document.querySelectorAll('.accent-option').forEach(o => o.classList.remove('active'));
+            option.classList.add('active');
+            const color = option.dataset.color;
+            state.currentAccentColor = color;
+            localStorage.setItem('localgram-accent-color', color);
+            applyAccentColor(color);
+        });
+    });
+
+    document.getElementById('resetAppearanceBtn')?.addEventListener('click', () => {
+        if (confirm('Сбросить все настройки оформления?')) {
+            localStorage.removeItem('localgram-chat-bg');
+            localStorage.removeItem('localgram-msg-style');
+            localStorage.removeItem('localgram-accent-color');
+            localStorage.removeItem('localgram-theme');
+
+            state.currentBg = 'default';
+            state.currentMsgStyle = 'default';
+            state.currentAccentColor = '#2aabee';
+
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            applyTheme(prefersDark ? 'dark' : 'light');
+            applyChatBackground('default');
+            applyAccentColor('#2aabee');
+
+            document.querySelectorAll('.theme-option').forEach(o => {
+                o.classList.toggle('active', o.dataset.theme === (prefersDark ? 'dark' : 'light'));
+            });
+            document.querySelectorAll('.bg-option').forEach(o => {
+                o.classList.toggle('active', o.dataset.bg === 'default');
+            });
+            document.querySelectorAll('.msg-style-option').forEach(o => {
+                o.classList.toggle('active', o.dataset.style === 'default');
+            });
+            document.querySelectorAll('.accent-option').forEach(o => {
+                o.classList.toggle('active', o.dataset.color === '#2aabee');
+            });
+
+            alert('Настройки сброшены!');
+        }
+    });
+}
+
+function initLanguageSettings() {
+    const langOptions = document.querySelectorAll('.language-option');
+    const currentLang = localStorage.getItem('localgram-language') || 'ru';
+
+    langOptions.forEach(option => {
+        option.classList.toggle('active', option.dataset.lang === currentLang);
+        option.replaceWith?.(option.cloneNode(true));
+    });
+
+    document.querySelectorAll('.language-option').forEach(option => {
+        option.addEventListener('click', () => {
+            document.querySelectorAll('.language-option').forEach(o => o.classList.remove('active'));
+            option.classList.add('active');
+            const lang = option.dataset.lang;
+            localStorage.setItem('localgram-language', lang);
+            alert(`Язык изменён на ${option.querySelector('.lang-name')?.textContent || lang}`);
+        });
+    });
+}
+
+function initNotificationToggles() {
+    const pushToggle = document.getElementById('pushNotificationsToggle');
+    const soundToggle = document.getElementById('soundNotificationsToggle');
+    const previewToggle = document.getElementById('previewNotificationsToggle');
+
+    const savedPush = localStorage.getItem('localgram-push-notifications');
+    const savedSound = localStorage.getItem('localgram-sound-notifications');
+    const savedPreview = localStorage.getItem('localgram-preview-notifications');
+
+    if (pushToggle) {
+        pushToggle.checked = savedPush !== 'false';
+        pushToggle.addEventListener('change', () => {
+            localStorage.setItem('localgram-push-notifications', pushToggle.checked);
+            if (pushToggle.checked) {
+                requestNotificationPermission();
+            } else {
+                state.notificationsEnabled = false;
+            }
+        });
+    }
+
+    if (soundToggle) {
+        soundToggle.checked = savedSound !== 'false';
+        soundToggle.addEventListener('change', () => {
+            localStorage.setItem('localgram-sound-notifications', soundToggle.checked);
+        });
+    }
+
+    if (previewToggle) {
+        previewToggle.checked = savedPreview !== 'false';
+        previewToggle.addEventListener('change', () => {
+            localStorage.setItem('localgram-preview-notifications', previewToggle.checked);
+        });
+    }
+}
+
+// ===== УВЕДОМЛЕНИЯ =====
+
+function initNotifications() {
+    if (!('Notification' in window)) {
+        console.log('Браузер не поддерживает уведомления');
+        return;
+    }
+
+    if (Notification.permission === 'default') {
+        document.addEventListener('click', requestNotificationPermission, { once: true });
+    } else if (Notification.permission === 'granted') {
+        state.notificationsEnabled = true;
+        if (window.location.protocol === 'https:' || window.location.hostname === 'localhost') {
+            subscribeToPush();
+        }
+    }
+}
+
+async function registerServiceWorker() {
+    if (window.location.protocol === 'file:') {
+        console.log('Service Worker не поддерживается в локальном окружении');
+        return;
+    }
+    
+    try {
+        const registration = await navigator.serviceWorker.register('/sw.js', {
+            scope: '/'
+        });
+        console.log('Service Worker зарегистрирован:', registration);
+
+        const subscription = await registration.pushManager.getSubscription();
+        if (subscription) {
+            state.pushSubscription = subscription;
+            savePushSubscription(subscription);
+        }
+    } catch (error) {
+        console.log('Service Worker регистрация не удалась:', error);
+    }
+}
+
+async function subscribeToPush() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    if (window.location.protocol === 'file:') return;
+
+    try {
+        const registration = await navigator.serviceWorker.ready;
+        let subscription = await registration.pushManager.getSubscription();
+
+        if (!subscription) {
+            const publicKey = await getPublicKey();
+            if (!publicKey) {
+                console.log('Публичный ключ не получен');
+                return;
+            }
+            subscription = await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: publicKey
+            });
+        }
+
+        state.pushSubscription = subscription;
+        await savePushSubscription(subscription);
+        console.log('Подписка на push создана');
+    } catch (error) {
+        console.log('Ошибка подписки на push:', error);
+    }
+}
+
+async function getPublicKey() {
+    const vapidPublicKey = 'BEl62iUYgUwfxN8vBk4qEQPp-1_N9ngnDxjFQ0lGJPuJ0ClzLwqLcM97JtWrXQnQ9JmYb6XJtP6h5t5hr5t5hr5t5hr5t5hr5t5hr5t5hr5t5';
+    return urlBase64ToUint8Array(vapidPublicKey);
+}
+
+function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+}
+
+async function savePushSubscription(subscription) {
+    if (!state.user) return;
+    
+    try {
+        const subscriptionData = {
+            endpoint: subscription.endpoint,
+            keys: {
+                p256dh: subscription.toJSON().keys.p256dh,
+                auth: subscription.toJSON().keys.auth
+            },
+            userAgent: navigator.userAgent,
+            isMobile: state.isMobile,
+            updatedAt: Date.now()
+        };
+
+        await db.ref(`push_subscriptions/${state.user.uid}/${subscription.endpoint}`).set(subscriptionData);
+    } catch (error) {
+        if (error.message && error.message.includes('permission_denied')) {
+            console.log('Нет прав для сохранения подписки push');
+        } else {
+            console.log('Ошибка сохранения подписки:', error);
+        }
+    }
+}
+
+async function sendPushNotification(chatId, partnerId, message, partnerName) {
+    try {
+        const notificationData = {
+            chatId: chatId,
+            partnerId: partnerId,
+            message: message,
+            partnerName: partnerName,
+            timestamp: Date.now(),
+            type: 'message'
+        };
+
+        try {
+            await db.ref(`notifications/${partnerId}/${chatId}`).update({
+                lastMessage: message,
+                timestamp: Date.now(),
+                read: false
+            });
+        } catch (error) {
+            if (error.message && error.message.includes('permission_denied')) {
+                console.log('Нет прав для сохранения уведомления');
+            } else {
+                throw error;
+            }
+        }
+
+        showBrowserNotification(partnerName, message, chatId);
+        playNotificationSound();
+
+    } catch (error) {
+        console.log('Ошибка отправки уведомления:', error);
+    }
+}
+
+function showBrowserNotification(title, body, chatId) {
+    if (!state.notificationsEnabled && Notification.permission !== 'granted') return;
+    if (!('Notification' in window)) return;
+
+    if (state.activeChatId === chatId && document.hasFocus()) return;
+
+    const now = Date.now();
+    if (now - state.lastNotificationTimestamp < 3000) return;
+    state.lastNotificationTimestamp = now;
+
+    try {
+        const notification = new Notification(`💬 ${title}`, {
+            body: body,
+            icon: '/favicon.ico',
+            badge: '/badge-icon.png',
+            vibrate: [200, 100, 200],
+            silent: true,
+            tag: chatId,
+            requireInteraction: false,
+            data: {
+                chatId: chatId,
+                url: window.location.href
+            }
+        });
+
+        notification.onclick = (event) => {
+            event.preventDefault();
+            window.focus();
+            if (chatId) {
+                const partner = state.activePartner;
+                if (partner && partner.uid) {
+                    openChat(chatId, partner);
+                }
+            }
+            notification.close();
+        };
+
+        setTimeout(() => notification.close(), 8000);
+    } catch (error) {
+        console.log('Ошибка показа уведомления:', error);
+    }
+}
+
+function playNotificationSound() {
+    try {
+        const audioCtx = new(window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        oscillator.frequency.value = 800;
+        oscillator.type = 'sine';
+
+        gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+
+        oscillator.start(audioCtx.currentTime);
+        oscillator.stop(audioCtx.currentTime + 0.3);
+
+        setTimeout(() => {
+            const osc2 = audioCtx.createOscillator();
+            const gain2 = audioCtx.createGain();
+            osc2.connect(gain2);
+            gain2.connect(audioCtx.destination);
+            osc2.frequency.value = 1000;
+            osc2.type = 'sine';
+            gain2.gain.setValueAtTime(0.2, audioCtx.currentTime);
+            gain2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+            osc2.start(audioCtx.currentTime);
+            osc2.stop(audioCtx.currentTime + 0.15);
+        }, 150);
+
+    } catch (error) {
+        console.log('Звук уведомления не воспроизведен');
+    }
+}
+
+function requestNotificationPermission() {
+    if (!('Notification' in window)) {
+        alert('Ваш браузер не поддерживает уведомления');
+        return;
+    }
+
+    if (Notification.permission === 'granted') {
+        state.notificationsEnabled = true;
+        alert('✅ Уведомления уже включены');
+        return;
+    }
+
+    if (Notification.permission === 'denied') {
+        alert('❌ Уведомления заблокированы в браузере. Разрешите их в настройках браузера.');
+        return;
+    }
+
+    Notification.requestPermission().then(permission => {
+        if (permission === 'granted') {
+            state.notificationsEnabled = true;
+            subscribeToPush();
+            alert('✅ Уведомления включены!');
+        } else {
+            alert('❌ Уведомления отключены');
+        }
+    });
+}
+
+function listenForNotifications() {
+    if (!state.user) return;
+
+    const ref = db.ref(`notifications/${state.user.uid}`);
+    ref.on('child_added', (snapshot) => {
+        const notification = snapshot.val();
+        if (!notification || notification.read) return;
+
+        if (state.activeChatId === snapshot.key) {
+            db.ref(`notifications/${state.user.uid}/${snapshot.key}/read`).set(true);
+            return;
+        }
+
+        const senderName = notification.senderName || 'Кто-то';
+        const message = notification.message || 'Новое сообщение';
+
+        showBrowserNotification(senderName, message, snapshot.key);
+        playNotificationSound();
+        updateUnreadCount();
+    });
+}
+
+function updateUnreadCount() {
+    if (!state.user) return;
+
+    db.ref(`notifications/${state.user.uid}`).once('value', (snapshot) => {
+        const notifications = snapshot.val() || {};
+        const unread = Object.values(notifications).filter(n => !n.read).length;
+
+        if (unread > 0) {
+            document.title = `(${unread}) Localgram`;
+        } else {
+            document.title = 'Localgram';
+        }
+
+        if (navigator.setAppBadge) {
+            navigator.setAppBadge(unread).catch(() => {});
+        }
+    });
+}
+
+// ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (UI) =====
 
 function setAvatar(element, label, avatarUrl) {
     if (!element) return;
@@ -2445,51 +2623,115 @@ function searchMessage(text) {
     return item;
 }
 
-function messageAction(label, type) {
-    const button = document.createElement("button");
-    button.className = `message-action ${type}`;
-    button.type = "button";
-    button.textContent = label;
-    return button;
+// ===== МОБИЛЬНЫЕ НАСТРОЙКИ (FULLSCREEN) =====
+
+function openSettingsPage(pageId) {
+    if (els.settingsModal) els.settingsModal.classList.add('hidden');
+    
+    const page = document.getElementById(pageId);
+    if (page) {
+        page.classList.remove('hidden');
+        page.style.padding = '0';
+        const card = page.querySelector('.modal-card');
+        if (card) {
+            card.style.borderRadius = '0';
+            card.style.height = '100vh';
+            card.style.height = '100dvh';
+            card.style.maxHeight = '100vh';
+            card.style.maxHeight = '100dvh';
+            card.style.width = '100%';
+            card.style.maxWidth = '100%';
+            card.style.margin = '0';
+            card.style.padding = '16px';
+            card.style.display = 'flex';
+            card.style.flexDirection = 'column';
+        }
+    }
 }
 
-function listenForNotifications() {
-    if (!state.user) return;
-
-    const ref = db.ref(`notifications/${state.user.uid}`);
-    ref.on('child_added', (snapshot) => {
-        const notification = snapshot.val();
-        if (!notification || notification.read) return;
-
-        if (state.activeChatId === snapshot.key) {
-            db.ref(`notifications/${state.user.uid}/${snapshot.key}/read`).set(true);
-            return;
-        }
-
-        const senderName = notification.senderName || 'Кто-то';
-        const message = notification.message || 'Новое сообщение';
-
-        showBrowserNotification(senderName, message, snapshot.key);
-        playNotificationSound();
-        updateUnreadCount();
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('[data-setting]').forEach(item => {
+        item.addEventListener('click', function() {
+            const setting = this.dataset.setting;
+            const pageMap = {
+                'folders': 'foldersSettings',
+                'security': 'securitySettings',
+                'devices': 'devicesSettings',
+                'notifications': 'notificationsSettings',
+                'appearance': 'appearanceSettings',
+                'language': 'languageSettings',
+                'shortcuts': 'shortcutsSettings',
+                'help': 'helpSettings',
+                'about': 'aboutModal'
+            };
+            
+            const pageId = pageMap[setting];
+            if (pageId) {
+                if (pageId === 'aboutModal') {
+                    if (els.settingsModal) els.settingsModal.classList.add('hidden');
+                    if (els.aboutModal) els.aboutModal.classList.remove('hidden');
+                } else {
+                    openSettingsPage(pageId);
+                }
+            }
+        });
     });
-}
-
-function updateUnreadCount() {
-    if (!state.user) return;
-
-    db.ref(`notifications/${state.user.uid}`).once('value', (snapshot) => {
-        const notifications = snapshot.val() || {};
-        const unread = Object.values(notifications).filter(n => !n.read).length;
-
-        if (unread > 0) {
-            document.title = `(${unread}) Localgram`;
-        } else {
-            document.title = 'Localgram';
-        }
-
-        if (navigator.setAppBadge) {
-            navigator.setAppBadge(unread).catch(() => {});
+    
+    const backButtons = [
+        'backFromAppearance', 'backFromLanguage', 'backFromNotifications',
+        'backFromSecurity', 'backFromDevices', 'backFromHelp',
+        'backFromShortcuts', 'backFromFolders'
+    ];
+    
+    backButtons.forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) {
+            btn.addEventListener('click', function() {
+                const page = this.closest('.modal');
+                if (page) page.classList.add('hidden');
+                if (els.settingsModal) els.settingsModal.classList.remove('hidden');
+            });
         }
     });
+    
+    const closeButtons = [
+        'closeAppearanceBtn', 'closeLanguageBtn', 'closeNotificationsBtn',
+        'closeSecurityBtn', 'closeDevicesBtn', 'closeHelpBtn',
+        'closeShortcutsBtn', 'closeFoldersBtn'
+    ];
+    
+    closeButtons.forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) {
+            btn.addEventListener('click', function() {
+                const page = this.closest('.modal');
+                if (page) page.classList.add('hidden');
+            });
+        }
+    });
+});
+
+const originalOpenSettings = window.openSettingsModal;
+if (originalOpenSettings) {
+    window.openSettingsModal = function() {
+        if (els.settingsModal) {
+            els.settingsModal.classList.remove('hidden');
+            if (window.innerWidth <= 768) {
+                const card = els.settingsModal.querySelector('.modal-card');
+                if (card) {
+                    card.style.borderRadius = '0';
+                    card.style.height = '100vh';
+                    card.style.height = '100dvh';
+                    card.style.maxHeight = '100vh';
+                    card.style.maxHeight = '100dvh';
+                    card.style.width = '100%';
+                    card.style.maxWidth = '100%';
+                    card.style.margin = '0';
+                    card.style.padding = '16px';
+                    card.style.display = 'flex';
+                    card.style.flexDirection = 'column';
+                }
+            }
+        }
+    };
 }
