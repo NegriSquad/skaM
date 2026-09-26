@@ -121,45 +121,48 @@ async function handleRegister(e) {
     const email = $("regEmail").value.trim();
     const password = $("regPassword").value;
 
-    if (!nickname || !username || !email || password.length < 6) return authError(form, "Заполните все поля. Пароль — минимум 6 символов.");
-    if (!isValidUsername(username)) return authError(form, "Username: латиница, цифры и _, от 3 до 32 символов.");
+    if (!nickname || !username || !email || password.length < 6) {
+        return authError(form, "Заполните все поля. Пароль — минимум 6 символов.");
+    }
+    if (!isValidUsername(username)) {
+        return authError(form, "Username: латиница, цифры и _, от 3 до 32 символов.");
+    }
 
     const btn = form.querySelector(".tg-btn.primary");
     btn.disabled = true;
+
     try {
-        // ✅ Правильно: catch ставим на Promise, а не на результат .val()
-        const snap = await db.ref(`usernames/${username}`).once("value").catch(() => null);
-        const taken = snap ? snap.val() : null;
+        // 1. Проверяем username (правило .read: true разрешает)
+        let taken = null;
+        try {
+            const snap = await db.ref(`usernames/${username}`).once("value");
+            taken = snap.val();
+        } catch (err) {
+            console.warn("[localgram] username check failed:", err.message);
+        }
         if (taken) {
             authError(form, "Этот username уже занят.");
             return;
         }
 
+        // 2. Создаём пользователя в Auth
         const { user } = await auth.createUserWithEmailAndPassword(email, password);
 
-        // Ждём, пока Firebase SDK обновит токен
-        await new Promise((r) => setTimeout(r, 800));
+        // 3. КРИТИЧНО: форсируем обновление ID-токена для RTDB
+        await user.getIdToken(true);
 
+        // 4. Пишем профиль и username (токен уже готов)
         const profile = {
             email, username, nickname,
             avatarUrl: "", bio: "",
             createdAt: Date.now(), updatedAt: Date.now()
         };
 
-        // Пробуем записать с повторами
-        for (let attempt = 0; attempt < 3; attempt++) {
-            try {
-                await db.ref(`users/${user.uid}`).set(profile);
-                await db.ref(`usernames/${username}`).set(user.uid);
-                break;
-            } catch (err) {
-                console.warn(`[localgram] write attempt ${attempt + 1} failed:`, err.message);
-                if (attempt === 2) throw err;
-                await new Promise((r) => setTimeout(r, 700 * (attempt + 1)));
-            }
-        }
+        await db.ref(`users/${user.uid}`).set(profile);
+        await db.ref(`usernames/${username}`).set(user.uid);
 
         state.profile = profile;
+        console.log("[localgram] registration complete for uid:", user.uid);
     } catch (error) {
         console.error("[localgram] register error:", error);
         authError(form, friendlyError(error));
@@ -172,6 +175,7 @@ async function handleAuthState(user) {
     offGroup("global");
     offGroup("chat");
     state.user = user;
+
     if (!user) {
         state.profile = null;
         state.chats = {};
@@ -180,31 +184,22 @@ async function handleAuthState(user) {
         return;
     }
 
-    // Читаем профиль с 3 попытками (токен Firebase может быть ещё не готов)
+    // Читаем профиль с повторами — токен может быть ещё не готов
     let profile = null;
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let i = 0; i < 5; i++) {
         try {
-            profile = (await db.ref(`users/${user.uid}`).once("value")).val();
-            break;
+            const snap = await db.ref(`users/${user.uid}`).once("value");
+            profile = snap.val();
+            if (profile) break;
         } catch (err) {
-            console.warn(`[localgram] profile read attempt ${attempt + 1} failed:`, err.message);
-            await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+            console.warn(`[localgram] profile read attempt ${i + 1}:`, err.message);
         }
-    }
-
-    // Не создаём профиль-заглушку, если чтение просто не удалось
-    // (профиль создаст handleRegister)
-    if (!profile) {
-        // Ждём ещё немного — возможно, handleRegister ещё пишет
-        await new Promise((r) => setTimeout(r, 1000));
-        try {
-            profile = (await db.ref(`users/${user.uid}`).once("value")).val();
-        } catch {}
+        await new Promise((r) => setTimeout(r, 500));
     }
 
     if (!profile) {
-        // Профиля всё ещё нет — не пускаем в приложение, но и не кидаем на логин с ошибкой
-        console.warn("[localgram] profile not found yet");
+        console.warn("[localgram] profile not found after 5 attempts");
+        toast("Профиль не найден. Войдите снова.");
         showAuth("login");
         return;
     }
@@ -214,6 +209,7 @@ async function handleAuthState(user) {
     $("app").classList.remove("hidden");
     renderDrawerProfile();
     startPresence();
+
     listen("global", db.ref(`users/${user.uid}`), "value", (snap) => {
         if (!snap.val()) return;
         state.profile = snap.val();
@@ -221,7 +217,6 @@ async function handleAuthState(user) {
     });
     listenChats();
 }
-
 function startPresence() {
     const uid = state.user.uid;
     const userRef = db.ref(`users/${uid}`);
