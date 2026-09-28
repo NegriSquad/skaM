@@ -136,11 +136,26 @@ async function openUserByUsername(username) {
     openUserProfile(user.uid);
 }
 
-/* ===== PROFILE EDITOR ===== */
+/* ===== PROFILE PANEL (slide-in) ===== */
 
 function openProfileEditor() {
     closeDrawer();
+    closeSettings();
+    renderProfilePanel();
+    $("profilePanel").classList.add("open");
+    $("profilePanel").setAttribute("aria-hidden", "false");
+    $("profileOverlay").classList.remove("hidden");
+}
+
+function closeProfilePanel() {
+    $("profilePanel").classList.remove("open");
+    $("profilePanel").setAttribute("aria-hidden", "true");
+    $("profileOverlay").classList.add("hidden");
+}
+
+function renderProfilePanel() {
     const p = state.profile;
+    if (!p) return;
     let newAvatar = null;
     const avatar = avatarEl(p.nickname, p.avatarUrl, "huge", { key: state.user.uid });
     const fileInput = h("input", { type: "file", accept: "image/*", hidden: true });
@@ -191,7 +206,7 @@ function openProfileEditor() {
             });
             if (Object.keys(partnerUpdates).length) await db.ref().update(partnerUpdates).catch(() => {});
             renderDrawerProfile();
-            closeModal();
+            closeProfilePanel();
             toast("Профиль сохранён");
         } catch (error) {
             toast(friendlyError(error));
@@ -199,53 +214,411 @@ function openProfileEditor() {
         }
     });
 
-    openModal({
-        title: "Мой профиль",
-        body: [
-            avatarBtn, fileInput,
+    $("profileBody").replaceChildren(
+        h("div", { class: "profile-edit-hero" }, avatarBtn, fileInput),
+        h("div", { class: "profile-edit-fields" },
             h("label", { class: "tg-field" }, nickname, h("span", { text: "Имя" })),
             h("label", { class: "tg-field" }, bio, h("span", { text: "О себе" })),
             h("div", {}, h("label", { class: "tg-field" }, username, h("span", { text: "Username" })), hint),
-            h("p", { class: "field-hint", text: `Email: ${p.email || state.user.email || "—"}` }),
-            save,
-        ],
-    });
+            h("p", { class: "field-hint", text: `Email: ${p.email || state.user.email || "—"}` })
+        ),
+        h("div", { class: "profile-edit-actions" }, save)
+    );
 }
 
-/* ===== SETTINGS ===== */
+/* ===== SETTINGS (slide-in панель) ===== */
+
+let settingsBackHandler = null;
 
 function openSettings() {
     closeDrawer();
+    settingsBackHandler = null;
+    renderSettingsMain();
+    $("settingsPanel").classList.add("open");
+    $("settingsPanel").setAttribute("aria-hidden", "false");
+    $("settingsOverlay").classList.remove("hidden");
+}
+
+function closeSettings() {
+    $("settingsPanel").classList.remove("open");
+    $("settingsPanel").setAttribute("aria-hidden", "true");
+    $("settingsOverlay").classList.add("hidden");
+}
+
+function settingRow(iconName, title, subtitle, onClick, extra) {
+    return h("button", { class: "settings-row", onclick: onClick },
+        h("span", { class: "settings-icon" }, icon(iconName)),
+        h("span", { class: "settings-text" },
+            h("strong", { text: title }),
+            subtitle ? h("small", { text: subtitle }) : null
+        ),
+        extra || null
+    );
+}
+
+function openSettingsSub(title, renderFn) {
+    settingsBackHandler = renderSettingsMain;
+    $("settingsTitle").textContent = title;
+    $("settingsBackBtn").classList.remove("hidden");
+    renderFn();
+}
+
+function renderSettingsMain() {
+    settingsBackHandler = null;
+    $("settingsTitle").textContent = "Настройки";
+    $("settingsBackBtn").classList.add("hidden");
+    $("settingsBody").replaceChildren(
+        h("div", { class: "settings-group" },
+            h("div", { class: "settings-group-title", text: "Аккаунт" }),
+            settingRow("user", "Профиль", "Имя, @username, фото", () => { closeSettings(); openProfileEditor(); }),
+            settingRow("bell", "Уведомления и звуки", "Звуки, вибрация", () => openSettingsSub("Уведомления и звуки", renderSettingsNotifications)),
+            settingRow("lock", "Конфиденциальность", "Последняя активность, пересылка", () => openSettingsSub("Конфиденциальность", renderSettingsPrivacy)),
+            settingRow("archive", "Данные и память", "Кэш, автоскачивание", () => openSettingsSub("Данные и память", renderSettingsData))
+        ),
+        h("div", { class: "settings-group" },
+            h("div", { class: "settings-group-title", text: "Оформление" }),
+            settingRow("edit", "Оформление", "Тема, размер текста", () => openSettingsSub("Оформление", renderSettingsAppearance)),
+            settingRow("at", "Язык", currentLanguageLabel(), () => openSettingsSub("Язык", renderSettingsLanguage))
+        ),
+        h("div", { class: "settings-group" },
+            h("div", { class: "settings-group-title", text: "Прочее" }),
+            settingRow("bookmark", "Стикеры и эмодзи", "Последние и предложения", () => openSettingsSub("Стикеры и эмодзи", renderSettingsStickers)),
+            settingRow("star", "Localgram Premium", "Уникальные функции", () => openSettingsSub("Localgram Premium", renderSettingsPremium)),
+            settingRow("info", "О приложении", "Localgram Web 2.0", () => openSettingsSub("О приложении", renderSettingsAbout))
+        ),
+        h("div", { class: "settings-group" },
+            h("button", { class: "settings-row danger", onclick: async () => {
+                const ok = await confirmDialog({ title: "Выход", text: "Вы уверены, что хотите выйти?", ok: "Выйти", danger: true });
+                if (ok) logout();
+            }},
+                h("span", { class: "settings-icon" }, icon("logout")),
+                h("span", { class: "settings-text" }, h("strong", { text: "Выйти из аккаунта" })))
+        )
+    );
+}
+
+function currentLanguageLabel() {
+    const l = state.settings.language || "ru";
+    return { ru: "Русский", en: "English", uk: "Українська", de: "Deutsch" }[l] || "Русский";
+}
+
+/* --- Notifications --- */
+
+function renderSettingsNotifications() {
     const s = state.settings;
-    const settingSwitch = (label, sub, checked, onChange) => {
+    const toggle = (key, label, sub, def) => {
         const input = h("input", { type: "checkbox", class: "switch" });
-        input.checked = checked;
-        input.addEventListener("change", () => onChange(input.checked));
-        return h("label", { class: "setting-row" }, h("span", {}, label, sub ? h("small", { text: sub }) : null), input);
+        input.checked = s[key] !== undefined ? s[key] : def;
+        input.addEventListener("change", () => { state.settings[key] = input.checked; saveSettings(); });
+        return h("label", { class: "settings-row" },
+            h("span", { class: "settings-text" }, h("strong", { text: label }), sub ? h("small", { text: sub }) : null),
+            input);
     };
-    const size = h("input", { type: "range", min: 13, max: 20, step: 1, "aria-label": "Размер текста" });
+    $("settingsBody").replaceChildren(
+        h("div", { class: "settings-group" },
+            h("div", { class: "settings-group-title", text: "Общие" }),
+            toggle("notifications", "Показывать уведомления", "Всплывающие уведомления о новых сообщениях", true),
+            toggle("sound", "Звук", "Звуковое сопровождение", true),
+            toggle("vibrate", "Вибрация", "Вибрировать при новом сообщении", true),
+            toggle("preview", "Предпросмотр", "Показывать текст в уведомлении", true)
+        ),
+        h("div", { class: "settings-group" },
+            h("div", { class: "settings-group-title", text: "Типы чатов" }),
+            toggle("notifyPrivate", "Личные чаты", "Уведомления о личных сообщениях", true),
+            toggle("notifyGroups", "Группы", "Уведомления из групп", true),
+            toggle("notifySaved", "Избранное", null, false)
+        ),
+        h("div", { class: "settings-group" },
+            h("div", { class: "settings-group-title", text: "В приложении" }),
+            toggle("inAppSound", "Звуки в приложении", null, true),
+            toggle("inAppVibrate", "Вибрация в приложении", null, true),
+            toggle("inAppPreview", "Показывать предпросмотр", null, true)
+        )
+    );
+}
+
+/* --- Privacy --- */
+
+function renderSettingsPrivacy() {
+    const s = state.settings;
+    const dropdown = (key, label, options, def) => {
+        const value = s[key] !== undefined ? s[key] : def;
+        const select = h("select", { class: "settings-select" });
+        options.forEach(([v, text]) => {
+            const opt = h("option", { value: v, text });
+            if (v === value) opt.selected = true;
+            select.appendChild(opt);
+        });
+        select.addEventListener("change", () => { state.settings[key] = select.value; saveSettings(); });
+        return h("div", { class: "settings-row" },
+            h("span", { class: "settings-text" }, h("strong", { text: label })),
+            select);
+    };
+    const toggle = (key, label, sub, def) => {
+        const input = h("input", { type: "checkbox", class: "switch" });
+        input.checked = s[key] !== undefined ? s[key] : def;
+        input.addEventListener("change", () => { state.settings[key] = input.checked; saveSettings(); });
+        return h("label", { class: "settings-row" },
+            h("span", { class: "settings-text" }, h("strong", { text: label }), sub ? h("small", { text: sub }) : null),
+            input);
+    };
+    const opts = [["everyone", "Все"], ["contacts", "Мои контакты"], ["nobody", "Никто"]];
+    $("settingsBody").replaceChildren(
+        h("div", { class: "settings-group" },
+            h("div", { class: "settings-group-title", text: "Кто видит мои данные" }),
+            dropdown("lastSeen", "Последняя активность", opts, "everyone"),
+            dropdown("profilePhoto", "Фото профиля", opts, "everyone"),
+            dropdown("bioVisibility", "О себе", opts, "everyone"),
+            dropdown("callsFrom", "Звонки", opts, "everyone"),
+            dropdown("groupsFrom", "Группы и каналы", [["everyone", "Все"], ["contacts", "Мои контакты"]], "everyone")
+        ),
+        h("div", { class: "settings-group" },
+            h("div", { class: "settings-group-title", text: "Сообщения" }),
+            toggle("readReceipts", "Отчёты о прочтении", "Отправлять галочки о прочтении", true),
+            toggle("forwardLink", "Ссылка на профиль при пересылке", "Показывать @username при пересылке", true),
+            toggle("sensitiveContent", "Деликатный контент", "Показывать контент 18+", false)
+        ),
+        h("div", { class: "settings-group" },
+            h("div", { class: "settings-group-title", text: "Безопасность" }),
+            settingRow("lock", "Двухэтапная аутентификация", "Облачный пароль", () => toast("В разработке")),
+            settingRow("eye", "Активные сессии", "Устройства со входом", () => toast("В разработке")),
+            settingRow("trash", "Удалить аккаунт", "Безвозвратно", async () => {
+                const ok = await confirmDialog({ title: "Удалить аккаунт", text: "Это действие нельзя отменить. Продолжить?", ok: "Удалить", danger: true });
+                if (ok) toast("В разработке");
+            }, null)
+        )
+    );
+}
+
+/* --- Data --- */
+
+function renderSettingsData() {
+    const s = state.settings;
+    const dropdown = (key, label, options, def) => {
+        const value = s[key] !== undefined ? s[key] : def;
+        const select = h("select", { class: "settings-select" });
+        options.forEach(([v, text]) => {
+            const opt = h("option", { value: v, text });
+            if (v === value) opt.selected = true;
+            select.appendChild(opt);
+        });
+        select.addEventListener("change", () => { state.settings[key] = select.value; saveSettings(); });
+        return h("div", { class: "settings-row" },
+            h("span", { class: "settings-text" }, h("strong", { text: label })),
+            select);
+    };
+    const auto = [["wifi", "Только Wi-Fi"], ["always", "Всегда"], ["never", "Никогда"]];
+    $("settingsBody").replaceChildren(
+        h("div", { class: "settings-group" },
+            h("div", { class: "settings-group-title", text: "Использование памяти" }),
+            settingRow("archive", "Размер кэша", "~12 МБ", () => toast("Кэш: ~12 МБ")),
+            h("button", { class: "settings-row danger", onclick: () => { localStorage.removeItem("localgram_recent_emoji"); toast("Кэш очищен"); } },
+                h("span", { class: "settings-icon" }, icon("trash")),
+                h("span", { class: "settings-text" }, h("strong", { text: "Очистить кэш" }))),
+            dropdown("cacheLifetime", "Хранить кэш", [["3d", "3 дня"], ["1w", "1 неделя"], ["1m", "1 месяц"], ["forever", "Всегда"]], "1w")
+        ),
+        h("div", { class: "settings-group" },
+            h("div", { class: "settings-group-title", text: "Автоскачивание медиа" }),
+            dropdown("autoDownloadPhotos", "Фото", auto, "always"),
+            dropdown("autoDownloadVideos", "Видео", auto, "wifi"),
+            dropdown("autoDownloadFiles", "Файлы", auto, "wifi"),
+            dropdown("autoDownloadVoice", "Голосовые", auto, "always")
+        ),
+        h("div", { class: "settings-group" },
+            h("div", { class: "settings-group-title", text: "Экономия" }),
+            (() => {
+                const input = h("input", { type: "checkbox", class: "switch" });
+                input.checked = s.saveTraffic === true;
+                input.addEventListener("change", () => { state.settings.saveTraffic = input.checked; saveSettings(); });
+                return h("label", { class: "settings-row" },
+                    h("span", { class: "settings-text" }, h("strong", { text: "Экономия трафика" }), h("small", { text: "Снижение расхода интернета при звонках" })),
+                    input);
+            })()
+        )
+    );
+}
+
+/* --- Appearance --- */
+
+function renderSettingsAppearance() {
+    const s = state.settings;
+    const themeInput = h("input", { type: "checkbox", class: "switch" });
+    themeInput.checked = s.theme === "dark";
+    themeInput.addEventListener("change", () => { state.settings.theme = themeInput.checked ? "dark" : "light"; saveSettings(); });
+
+    const size = h("input", { type: "range", min: 13, max: 20, step: 1 });
     size.value = s.fontSize;
     const sizeLabel = h("span", { text: `${s.fontSize}px`, style: "min-width:40px;text-align:right" });
     size.addEventListener("input", () => { state.settings.fontSize = Number(size.value); sizeLabel.textContent = `${size.value}px`; saveSettings(); });
 
-    const notifSub = !("Notification" in window) ? "Не поддерживаются браузером" : Notification.permission === "denied" ? "Заблокированы в браузере" : "Показывать уведомления о новых сообщениях";
-
-    openModal({
-        title: "Настройки",
-        body: [
-            h("div", { class: "section-title", style: "padding-left:0", text: "Оформление" }),
-            settingSwitch("Ночной режим", null, s.theme === "dark", (v) => { state.settings.theme = v ? "dark" : "light"; saveSettings(); }),
-            h("div", {}, h("div", { class: "field-hint", style: "padding:0", text: "Размер текста сообщений" }), h("div", { class: "range-row" }, size, sizeLabel)),
-            h("div", { class: "section-title", style: "padding-left:0", text: "Чаты" }),
-            settingSwitch("Отправка по Enter", "Shift+Enter — новая строка. Если выключено — Ctrl+Enter", s.sendByEnter, (v) => { state.settings.sendByEnter = v; saveSettings(); }),
-            settingSwitch("Уведомления", notifSub, s.notifications && ("Notification" in window) && Notification.permission === "granted", async (v) => {
-                state.settings.notifications = v;
-                if (v && "Notification" in window && Notification.permission === "default") await Notification.requestPermission();
-                saveSettings();
-            }),
-            h("button", { class: "tg-btn danger", onclick: async () => { const ok = await confirmDialog({ title: "Выход", text: "Вы уверены, что хотите выйти?", ok: "Выйти", danger: true }); if (ok) logout(); } }, icon("logout"), "Выйти из аккаунта"),
-        ],
+    const radius = h("input", { type: "range", min: 6, max: 22, step: 1 });
+    radius.value = s.cornerRadius || 12;
+    const radiusLabel = h("span", { text: `${radius.value}px`, style: "min-width:40px;text-align:right" });
+    radius.addEventListener("input", () => {
+        state.settings.cornerRadius = Number(radius.value);
+        radiusLabel.textContent = `${radius.value}px`;
+        document.documentElement.style.setProperty("--radius", `${radius.value}px`);
+        saveSettings();
     });
+
+    const wallpaperColors = ["#0e1621", "#17212b", "#2b5278", "#d4e3b4", "#93c19a", "#b7c9a1", "#f2e9d8", "#e0e0e0"];
+    const wallpapers = h("div", { class: "wallpaper-grid" }, wallpaperColors.map((c) =>
+        h("button", {
+            class: `wallpaper-swatch ${s.chatWallpaper === c ? "active" : ""}`,
+            style: `background: ${c}`,
+            onclick: () => {
+                state.settings.chatWallpaper = c;
+                document.documentElement.style.setProperty("--chat-bg", c);
+                saveSettings();
+                renderSettingsAppearance();
+            }
+        })));
+
+    $("settingsBody").replaceChildren(
+        h("div", { class: "settings-group" },
+            h("div", { class: "settings-group-title", text: "Тема" }),
+            h("label", { class: "settings-row" },
+                h("span", { class: "settings-icon" }, icon("edit")),
+                h("span", { class: "settings-text" }, h("strong", { text: "Ночной режим" }), h("small", { text: "Тёмная тема оформления" })),
+                themeInput)
+        ),
+        h("div", { class: "settings-group" },
+            h("div", { class: "settings-group-title", text: "Текст" }),
+            h("div", { class: "settings-row" },
+                h("span", { class: "settings-icon" }, icon("at")),
+                h("span", { class: "settings-text" }, h("strong", { text: "Размер текста" }), h("small", { text: "Размер шрифта в сообщениях" })),
+                h("div", { class: "range-row", style: "flex:0 0 130px" }, size, sizeLabel)),
+            h("div", { class: "settings-row" },
+                h("span", { class: "settings-icon" }, icon("message")),
+                h("span", { class: "settings-text" }, h("strong", { text: "Углы сообщений" }), h("small", { text: "Округлость блоков сообщений" })),
+                h("div", { class: "range-row", style: "flex:0 0 130px" }, radius, radiusLabel))
+        ),
+        h("div", { class: "settings-group" },
+            h("div", { class: "settings-group-title", text: "Обои чата" }),
+            wallpapers
+        ),
+        h("div", { class: "settings-group" },
+            h("div", { class: "settings-group-title", text: "Жесты" }),
+            h("div", { class: "settings-row" },
+                h("span", { class: "settings-icon" }, icon("forward")),
+                h("span", { class: "settings-text" }, h("strong", { text: "Свайп в списке чатов" })),
+                (() => {
+                    const select = h("select", { class: "settings-select" });
+                    [["archive", "Архивировать"], ["delete", "Удалить"], ["read", "Прочитать"], ["pin", "Закрепить"]].forEach(([v, t]) => {
+                        const o = h("option", { value: v, text: t });
+                        if ((s.swipeAction || "archive") === v) o.selected = true;
+                        select.appendChild(o);
+                    });
+                    select.addEventListener("change", () => { state.settings.swipeAction = select.value; saveSettings(); });
+                    return select;
+                })())
+        )
+    );
+}
+
+/* --- Language --- */
+
+function renderSettingsLanguage() {
+    const langs = [["ru", "🇷🇺 Русский"], ["en", "🇬🇧 English"], ["uk", "🇺🇦 Українська"], ["de", "🇩🇪 Deutsch"]];
+    $("settingsBody").replaceChildren(
+        h("div", { class: "settings-group" },
+            h("div", { class: "settings-group-title", text: "Выберите язык" }),
+            ...langs.map(([code, label]) =>
+                h("button", {
+                    class: `settings-row ${(state.settings.language || "ru") === code ? "active" : ""}`,
+                    onclick: () => {
+                        state.settings.language = code;
+                        saveSettings();
+                        toast(`Язык: ${label.split(" ")[1]}`);
+                        renderSettingsLanguage();
+                    }
+                },
+                    h("span", { class: "settings-text" }, h("strong", { text: label })),
+                    (state.settings.language || "ru") === code ? h("span", { class: "settings-icon" }, icon("check")) : null))
+        )
+    );
+}
+
+/* --- Stickers --- */
+
+function renderSettingsStickers() {
+    const s = state.settings;
+    const recent = (() => { try { return JSON.parse(localStorage.getItem("localgram_recent_emoji") || "[]"); } catch { return []; } })();
+    const suggestions = h("input", { type: "checkbox", class: "switch" });
+    suggestions.checked = s.stickerSuggestions !== false;
+    suggestions.addEventListener("change", () => { state.settings.stickerSuggestions = suggestions.checked; saveSettings(); });
+
+    $("settingsBody").replaceChildren(
+        h("div", { class: "settings-group" },
+            h("div", { class: "settings-group-title", text: "Недавние" }),
+            h("div", { class: "emoji-grid", style: "padding:8px" },
+                ...(recent.length ? recent.map((e) => h("button", { text: e, style: "font-size:24px" })) : [h("p", { class: "field-hint", text: "Здесь появятся недавние эмодзи" })]))
+        ),
+        h("div", { class: "settings-group" },
+            h("div", { class: "settings-group-title", text: "Настройки" }),
+            h("label", { class: "settings-row" },
+                h("span", { class: "settings-text" }, h("strong", { text: "Предлагать стикеры" }), h("small", { text: "Показывать стикеры при вводе текста" })),
+                suggestions),
+            h("button", { class: "settings-row danger", onclick: () => { localStorage.removeItem("localgram_recent_emoji"); toast("История эмодзи очищена"); renderSettingsStickers(); } },
+                h("span", { class: "settings-icon" }, icon("trash")),
+                h("span", { class: "settings-text" }, h("strong", { text: "Очистить недавние" })))
+        )
+    );
+}
+
+/* --- Premium --- */
+
+function renderSettingsPremium() {
+    const features = [
+        ["⭐", "Уникальные стикеры", "Эксклюзивные наборы для подписчиков"],
+        ["📁", "Больше папок", "До 20 папок вместо 10"],
+        ["📤", "Загрузка до 4 ГБ", "Отправляйте большие файлы"],
+        ["🎙", "Перевод в текст", "Голосовые в текст одним касанием"],
+        ["🚫", "Без рекламы", "Никаких спонсорских каналов"],
+        ["🎨", "Уникальные реакции", "Больше эмодзи-реакций"],
+        ["⚡", "Быстрая загрузка", "Приоритетная скорость скачивания"]
+    ];
+    $("settingsBody").replaceChildren(
+        h("div", { class: "premium-hero" },
+            h("div", { class: "premium-badge" }, "⭐ Localgram Premium"),
+            h("p", { text: "Откройте уникальные функции за небольшую подписку" })),
+        h("div", { class: "settings-group" },
+            h("div", { class: "settings-group-title", text: "Что вы получите" }),
+            ...features.map(([emoji, title, sub]) =>
+                h("div", { class: "settings-row" },
+                    h("span", { class: "settings-icon", style: "font-size:20px" }, emoji),
+                    h("span", { class: "settings-text" }, h("strong", { text: title }), h("small", { text: sub }))))
+        ),
+        h("div", { class: "settings-group" },
+            h("button", { class: "tg-btn primary", onclick: () => toast("В разработке") }, "Подписаться за 199 ₽/мес"),
+            h("button", { class: "tg-btn link", onclick: () => toast("В разработке") }, "Подарить Premium")
+        )
+    );
+}
+
+/* --- About --- */
+
+function renderSettingsAbout() {
+    $("settingsBody").replaceChildren(
+        h("div", { class: "about-hero" },
+            h("div", { class: "about-logo" },
+                h("svg", { viewBox: "0 0 24 24" }, h("path", { d: "M2.5 11.2 20.3 4.4c.8-.3 1.6.4 1.3 1.3l-3 14.2c-.2.9-1.2 1.2-1.9.7l-4.6-3.4-2.3 2.2c-.3.3-.8.1-.8-.3l.2-3.5 7.7-7c.3-.3 0-.7-.4-.5l-9.6 6-4.1-1.3c-.9-.3-.9-1.5 0-1.8z" }))),
+            h("h3", { text: "Localgram" }),
+            h("p", { class: "field-hint", text: "Версия Web 2.0" })
+        ),
+        h("div", { class: "settings-group" },
+            h("div", { class: "settings-group-title", text: "Информация" }),
+            settingRow("user", "Разработчик", "aylppcel", () => toast("aylppcel")),
+            settingRow("info", "Версия", "2.0.0", () => toast("Localgram Web 2.0")),
+            settingRow("file", "Лицензия", "MIT", () => toast("MIT License")),
+            settingRow("message", "Обратная связь", "Сообщить о проблеме", () => toast("В разработке"))
+        ),
+        h("div", { class: "settings-group" },
+            h("div", { class: "settings-group-title", text: "Технологии" }),
+            h("p", { class: "field-hint", style: "padding: 8px 14px", text: "Firebase · Vanilla JS · CSS3" })
+        ),
+        h("p", { class: "field-hint", style: "text-align:center;margin-top:20px", text: "© 2025 Localgram" })
+    );
 }
 
 /* ===== NEW CHAT / GROUP ===== */

@@ -5,6 +5,26 @@ let chatSearch = { query: "", hits: [], index: -1 };
 let newWhileAway = 0;
 let currentAudio = null;
 
+/* ===== HELPERS ===== */
+
+function dataUrlToBlobUrl(dataUrl) {
+    const comma = dataUrl.indexOf(",");
+    if (comma < 0) throw new Error("bad data url");
+    const meta = dataUrl.slice(0, comma);
+    const b64 = dataUrl.slice(comma + 1);
+    const mimeMatch = meta.match(/data:([^;]+)/);
+    const mime = mimeMatch ? mimeMatch[1] : "video/webm";
+    const bin = atob(b64);
+    const len = bin.length;
+    const arr = new Uint8Array(len);
+    for (let i = 0; i < len; i++) arr[i] = bin.charCodeAt(i);
+    return URL.createObjectURL(new Blob([arr], { type: mime }));
+}
+
+function isVideoDataUrl(s) {
+    return typeof s === "string" && s.startsWith("data:video/");
+}
+
 /* ===== OPEN / CLOSE ===== */
 
 function openChat(chatId) {
@@ -141,7 +161,6 @@ function loadMoreMessages() {
     ref.once("value", () => {
         requestAnimationFrame(() => { box.scrollTop = box.scrollHeight - prevHeight + prevTop; });
     });
-    // Re-subscribe with the larger window; the old listener is replaced.
     const oldListeners = listenerGroups.chat || [];
     oldListeners.shift()?.();
     listenerGroups.chat = oldListeners;
@@ -223,7 +242,7 @@ function renderMessages({ initial, prevLast } = {}) {
             inner.appendChild(h("div", { class: "sys-msg" }, h("span", { text: m.text })));
             return;
         }
-        const sig = JSON.stringify(m) + (entry?.pinnedMsg?.id === m.id ? "p" : "");
+        const sig = JSON.stringify({ ...m, data: undefined }) + (entry?.pinnedMsg?.id === m.id ? "p" : "");
         let node = msgCache.get(m.id);
         if (!node || node.dataset.sig !== sig) node = buildMessage(m, isGroup);
         node.dataset.sig = sig;
@@ -292,6 +311,8 @@ function buildMessage(m, isGroup) {
         bubble.appendChild(buildRoundVideo(m));
         meta.classList.add("on-media");
         bubble.style.position = "relative";
+    } else if (m.type === "videoFile") {
+        bubble.appendChild(buildVideoFile(m));
     } else if (m.type === "file") {
         bubble.appendChild(h("a", { class: "file-msg", href: m.data, download: m.fileName || "file" },
             h("span", { class: "file-icon" }, icon("download")),
@@ -304,7 +325,7 @@ function buildMessage(m, isGroup) {
         text.appendChild(meta);
         bubble.appendChild(text);
         if (!m.type && isEmojiOnly(m.text)) bubble.classList.add("no-bg");
-    } else if (m.type !== "image") {
+    } else if (m.type !== "image" && m.type !== "videoFile") {
         bubble.appendChild(meta);
     }
 
@@ -317,7 +338,7 @@ function buildMessage(m, isGroup) {
 
     row.appendChild(bubble);
     onLongPress(bubble, (e) => openMessageMenu(m, e));
-    bubble.addEventListener("dblclick", (e) => { if (!e.target.closest("a, button, video")) setReply(m); });
+    bubble.addEventListener("dblclick", (e) => { if (!e.target.closest("a, button, video, .video-file")) setReply(m); });
     return row;
 }
 
@@ -370,20 +391,98 @@ function buildVoice(m) {
     return h("div", { class: "voice" }, btn, h("span", { class: "voice-body" }, wave, time));
 }
 
+/* ===== КРУГЛОЕ ВИДЕО (исправлено) ===== */
+
 function buildRoundVideo(m) {
-    const video = h("video", { src: m.data, playsinline: true, preload: "metadata" });
-    video.muted = false;
-    const wrap = h("div", { class: "round-video" }, video,
-        h("span", { class: "rv-play" }, icon("play")),
-        h("span", { class: "rv-time", text: formatDuration(m.duration) }));
-    wrap.addEventListener("click", (e) => {
-        e.stopPropagation();
-        if (video.paused) { if (currentAudio) currentAudio.pause(); video.play(); wrap.classList.add("playing"); }
-        else { video.pause(); wrap.classList.remove("playing"); }
+    const wrap = h("div", { class: "round-video" });
+    const video = h("video", { playsinline: true, preload: "auto", muted: false, loop: false });
+    const playIcon = h("span", { class: "rv-play" }, icon("play"));
+    const timeEl = h("span", { class: "rv-time", text: formatDuration(m.duration) });
+    const loadingEl = h("span", { class: "rv-loading hidden" });
+
+    wrap.append(video, playIcon, timeEl, loadingEl);
+
+    let loaded = false;
+    let blobUrl = null;
+    let converting = false;
+
+    const ensureLoaded = () => {
+        if (loaded || converting) return;
+        converting = true;
+        try {
+            if (isVideoDataUrl(m.data)) {
+                blobUrl = dataUrlToBlobUrl(m.data);
+                video.src = blobUrl;
+            } else {
+                video.src = m.data;
+            }
+            video.load();
+            loaded = true;
+        } catch (err) {
+            console.warn("[localgram] blob conversion failed, fallback:", err);
+            video.src = m.data;
+            loaded = true;
+        }
+        converting = false;
+    };
+
+    const togglePlay = async (e) => {
+        if (e) e.stopPropagation();
+        ensureLoaded();
+        if (video.paused) {
+            if (currentAudio) currentAudio.pause();
+            loadingEl.classList.remove("hidden");
+            try {
+                await video.play();
+                wrap.classList.add("playing");
+            } catch (err) {
+                console.warn("[localgram] play error:", err);
+                toast("Не удалось воспроизвести видео");
+            } finally {
+                loadingEl.classList.add("hidden");
+            }
+        } else {
+            video.pause();
+            wrap.classList.remove("playing");
+        }
+    };
+
+    wrap.addEventListener("click", togglePlay);
+    video.addEventListener("click", (e) => { e.stopPropagation(); });
+    video.addEventListener("ended", () => { wrap.classList.remove("playing"); video.currentTime = 0; timeEl.textContent = formatDuration(m.duration); });
+    video.addEventListener("timeupdate", () => { timeEl.textContent = formatDuration(video.currentTime || 0); });
+    video.addEventListener("loadedmetadata", () => {
+        if (video.duration && isFinite(video.duration)) timeEl.textContent = formatDuration(video.duration);
     });
-    video.addEventListener("ended", () => { wrap.classList.remove("playing"); video.currentTime = 0; });
-    video.addEventListener("timeupdate", () => { wrap.querySelector(".rv-time").textContent = formatDuration(video.currentTime || m.duration); });
+    video.addEventListener("error", () => console.warn("[localgram] video error:", video.error));
+
+    // Cleanup blob URL при удалении элемента
+    const observer = new MutationObserver(() => {
+        if (!document.body.contains(wrap)) {
+            if (blobUrl) { try { URL.revokeObjectURL(blobUrl); } catch {} blobUrl = null; }
+            observer.disconnect();
+        }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+
     return wrap;
+}
+
+/* ===== ОБЫЧНОЕ ВИДЕО ===== */
+
+function buildVideoFile(m) {
+    const video = h("video", {
+        playsinline: true,
+        preload: "metadata",
+        controls: true,
+    });
+    try {
+        if (isVideoDataUrl(m.data)) video.src = dataUrlToBlobUrl(m.data);
+        else video.src = m.data;
+    } catch {
+        video.src = m.data;
+    }
+    return h("div", { class: "video-file" }, video);
 }
 
 function scrollToMessage(id) {
@@ -460,7 +559,7 @@ function openMessageMenu(m, e) {
     const out = m.senderId === uid;
     const entry = state.activeChat;
     const pinned = entry?.pinnedMsg?.id === m.id;
-    const canEdit = out && !m.forwardedFrom && (m.type ? true : !!m.text) && m.type !== "voice" && m.type !== "video";
+    const canEdit = out && !m.forwardedFrom && (m.type ? true : !!m.text) && m.type !== "voice" && m.type !== "video" && m.type !== "videoFile";
 
     const reactRow = h("div", { class: "ctx-reactions" }, QUICK_REACTIONS.map((emoji) =>
         h("button", { "aria-label": `Реакция ${emoji}`, text: emoji, onclick: () => { hideMenu(); toggleReaction(m, emoji); } })));
@@ -472,7 +571,7 @@ function openMessageMenu(m, e) {
         { label: pinned ? "Открепить" : "Закрепить", icon: "pin", onClick: () => togglePin(m) },
         { label: "Переслать", icon: "forward", onClick: () => openForward(m) },
         entry?.type !== "saved" ? { label: "В избранное", icon: "bookmark", onClick: () => saveToFavorites(m) } : null,
-        m.type === "image" || m.type === "file" ? { label: "Скачать", icon: "download", onClick: () => downloadData(m.data, m.fileName || "image.jpg") } : null,
+        m.type === "image" || m.type === "file" || m.type === "videoFile" ? { label: "Скачать", icon: "download", onClick: () => downloadData(m.data, m.fileName || "media") } : null,
         "sep",
         { label: "Удалить", icon: "trash", danger: true, onClick: () => deleteMessage(m) },
     ], { x: e.clientX, y: e.clientY }, entry?.type === "saved" ? null : reactRow);

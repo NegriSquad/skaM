@@ -60,11 +60,11 @@ function bindUI() {
         if (folder) setFolder(folder);
     });
 
-    const search = $("searchInput");
-    search.addEventListener("focus", openSearch);
-    search.addEventListener("input", renderSearch);
-    search.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeSearch(); search.blur(); } });
-    $("searchBackBtn").addEventListener("click", closeSearch);
+    $("searchToggleBtn").addEventListener("click", openSearch);
+    $("searchCloseBtn").addEventListener("click", closeSearch);
+    const searchInput = $("searchInput");
+    searchInput.addEventListener("input", renderSearch);
+    searchInput.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSearch(); });
 
     $("fabBtn").addEventListener("click", (e) => {
         e.stopPropagation();
@@ -130,14 +130,44 @@ function bindUI() {
     $("mediaViewerClose").addEventListener("click", closeViewer);
     $("mediaViewer").addEventListener("click", (e) => { if (e.target === $("mediaViewer") || e.target === $("mediaViewerImg")) closeViewer(); });
 
+    $("settingsBackBtn").addEventListener("click", () => { if (typeof settingsBackHandler !== "undefined" && settingsBackHandler) settingsBackHandler(); else closeSettings(); });
+    $("settingsCloseBtn").addEventListener("click", closeSettings);
+    $("settingsOverlay").addEventListener("click", closeSettings);
+    $("profileCloseBtn").addEventListener("click", closeProfilePanel);
+    $("profileOverlay").addEventListener("click", closeProfilePanel);
+
+    // === ЗВОНКИ: подключаем, если calls.js загрузился ===
+    if (typeof bindCallUI === "function") {
+        try {
+            bindCallUI();
+            console.log("[localgram] calls.js подключён ✓");
+        } catch (e) {
+            console.error("[localgram] bindCallUI error:", e);
+        }
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                setTimeout(() => {
+                    if (typeof initCallSystem === "function") initCallSystem();
+                }, 300);
+            } else {
+                if (typeof cleanupCallSystem === "function") cleanupCallSystem();
+            }
+        });
+    } else {
+        console.warn("[localgram] calls.js не загружен — звонки отключены");
+    }
+
     document.addEventListener("keydown", (e) => {
         if (e.key !== "Escape") return;
         if (!$("ctxMenu").classList.contains("hidden")) return hideMenu();
         if (!$("mediaViewer").classList.contains("hidden")) return closeViewer();
         if (!$("modalOverlay").classList.contains("hidden")) return closeModal();
         if (!$("emojiPicker").classList.contains("hidden")) return $("emojiPicker").classList.add("hidden");
+        if ($("settingsPanel").classList.contains("open")) return closeSettings();
+        if ($("profilePanel").classList.contains("open")) return closeProfilePanel();
+        if (!$("searchView").classList.contains("hidden")) return closeSearch();
         if ($("drawer").classList.contains("open")) return closeDrawer();
-        if (recorder) return stopRecording(true);
+        if (typeof recorder !== "undefined" && recorder) return stopRecording(true);
         if (document.activeElement === $("messageInput") && (state.replyTo || state.editing)) return;
         if (!$("chatSearch").classList.contains("hidden")) return closeChatSearch();
         if (!$("infoPanel").classList.contains("hidden")) return toggleInfoPanel(false);
