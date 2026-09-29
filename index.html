@@ -23,7 +23,6 @@
         <div class="auth-logo" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M2.5 11.2 20.3 4.4c.8-.3 1.6.4 1.3 1.3l-3 14.2c-.2.9-1.2 1.2-1.9.7l-4.6-3.4-2.3 2.2c-.3.3-.8.1-.8-.3l.2-3.5 7.7-7c.3-.3 0-.7-.4-.5l-9.6 6-4.1-1.3c-.9-.3-.9-1.5 0-1.8z"/></svg>
         </div>
-
         <form id="loginForm" class="auth-form" novalidate>
             <h1>Localgram</h1>
             <p class="auth-sub">Войдите, чтобы продолжить общение</p>
@@ -32,7 +31,6 @@
             <button type="submit" class="tg-btn primary">Войти</button>
             <button type="button" class="tg-btn link" data-auth-switch="register">Создать аккаунт</button>
         </form>
-
         <form id="registerForm" class="auth-form hidden" novalidate>
             <h1>Регистрация</h1>
             <p class="auth-sub">Придумайте имя и username</p>
@@ -60,7 +58,6 @@
                 <svg viewBox="0 0 24 24"><path d="M15.5 14h-.8l-.3-.3A6.5 6.5 0 1 0 9.5 16a6.5 6.5 0 0 0 4.2-1.6l.3.3v.8l5 5 1.5-1.5-5-5zm-6 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z"/></svg>
             </button>
         </header>
-
         <nav class="folders" id="folders" role="tablist" aria-label="Папки">
             <button class="folder active" role="tab" data-folder="all">Все чаты</button>
             <button class="folder" role="tab" data-folder="personal">Личные</button>
@@ -68,9 +65,7 @@
             <button class="folder" role="tab" data-folder="unread">Непрочитанные<span class="folder-badge hidden" id="unreadFolderBadge"></span></button>
             <button class="folder" role="tab" data-folder="archive">Архив</button>
         </nav>
-
         <div class="chat-list" id="chatList" role="list"></div>
-
         <div class="fab-wrap">
             <div class="fab-menu hidden" id="fabMenu" role="menu">
                 <button role="menuitem" data-action="new-group"><svg viewBox="0 0 24 24"><path d="M16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-8 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0 2c-2.3 0-7 1.2-7 3.5V19h14v-2.5C15 14.2 10.3 13 8 13zm8 0h-1c1.2.9 2 2 2 3.5V19h6v-2.5c0-2.3-4.7-3.5-7-3.5z"/></svg>Новая группа</button>
@@ -85,7 +80,6 @@
     <main class="chat" id="chat">
         <div class="chat-bg" aria-hidden="true"></div>
         <div class="chat-empty" id="chatEmpty"><span>Выберите чат, чтобы начать общение</span></div>
-
         <div class="chat-view hidden" id="chatView">
             <header class="chat-header">
                 <button id="chatBackBtn" class="icon-btn back-btn" aria-label="Назад к чатам">
@@ -105,6 +99,9 @@
                     <button id="chatVideoBtn" class="icon-btn call-btn" aria-label="Видеозвонок">
                         <svg viewBox="0 0 24 24"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg>
                     </button>
+                    <button id="chatGiftBtn" class="icon-btn" aria-label="Подарить">
+                        <svg viewBox="0 0 24 24"><path d="M20 6h-2.18c.11-.31.18-.65.18-1a2.996 2.996 0 0 0-5.5-1.65l-.5.67-.5-.68C10.96 2.54 10.05 2 9 2 7.34 2 6 3.34 6 5c0 .35.07.69.18 1H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-5-2c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zM9 4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm11 15H4v-2h16v2zm0-5H4V8h5.08L7 10.83 8.62 12 11 8.76l1-1.36 1 1.36L15.38 12 17 10.83 14.92 8H20v6z"/></svg>
+                    </button>
                     <button id="chatSearchBtn" class="icon-btn" aria-label="Поиск в чате">
                         <svg viewBox="0 0 24 24"><path d="M15.5 14h-.8l-.3-.3A6.5 6.5 0 1 0 9.5 16a6.5 6.5 0 0 0 4.2-1.6l.3.3v.8l5 5 1.5-1.5-5-5zm-6 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z"/></svg>
                     </button>
@@ -116,7 +113,6 @@
                     </button>
                 </div>
             </header>
-
             <div class="chat-search hidden" id="chatSearch">
                 <input id="chatSearchInput" type="search" placeholder="Поиск сообщений" aria-label="Поиск сообщений">
                 <span id="chatSearchCount" class="chat-search-count"></span>
@@ -124,20 +120,16 @@
                 <button id="chatSearchDown" class="icon-btn" aria-label="Следующее"><svg viewBox="0 0 24 24"><path d="M7.4 8.6 12 13.2l4.6-4.6L18 10l-6 6-6-6z"/></svg></button>
                 <button id="chatSearchClose" class="icon-btn" aria-label="Закрыть поиск"><svg viewBox="0 0 24 24"><path d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4l5.6 5.6L5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6z"/></svg></button>
             </div>
-
             <button class="pinned-bar hidden" id="pinnedBar" aria-label="Перейти к закреплённому сообщению">
                 <span class="pinned-line"></span>
                 <span class="pinned-text"><strong>Закреплённое сообщение</strong><small id="pinnedText"></small></span>
                 <span class="icon-btn" id="unpinBtn" role="button" aria-label="Открепить"><svg viewBox="0 0 24 24"><path d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4l5.6 5.6L5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6z"/></svg></span>
             </button>
-
             <div class="messages" id="messages" role="log" aria-live="polite"></div>
-
             <button class="scroll-down hidden" id="scrollDownBtn" aria-label="Вниз">
                 <svg viewBox="0 0 24 24"><path d="M7.4 8.6 12 13.2l4.6-4.6L18 10l-6 6-6-6z"/></svg>
                 <span class="badge hidden" id="scrollDownBadge"></span>
             </button>
-
             <footer class="composer" id="composer">
                 <div class="composer-box">
                     <div class="reply-bar hidden" id="replyBar">
@@ -177,7 +169,6 @@
             </footer>
             <div class="composer-disabled hidden" id="composerDisabled">Вы не можете писать в этот чат</div>
         </div>
-
         <div class="video-rec-preview hidden" id="videoRecPreview" aria-hidden="true">
             <video id="videoRecVideo" autoplay muted playsinline></video>
         </div>
@@ -213,13 +204,16 @@
         <span class="avatar large" id="drawerAvatar"></span>
         <strong id="drawerName"></strong>
         <small id="drawerUsername"></small>
+        <div class="drawer-stars" id="drawerStars">⭐ <span id="drawerStarsCount">0</span></div>
     </div>
     <div class="drawer-list">
         <button data-drawer="profile"><svg viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0 2c-2.7 0-8 1.3-8 4v2h16v-2c0-2.7-5.3-4-8-4z"/></svg>Мой профиль</button>
+        <button data-drawer="gifts"><svg viewBox="0 0 24 24"><path d="M20 6h-2.18c.11-.31.18-.65.18-1a2.996 2.996 0 0 0-5.5-1.65l-.5.67-.5-.68C10.96 2.54 10.05 2 9 2 7.34 2 6 3.34 6 5c0 .35.07.69.18 1H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-5-2c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zM9 4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm11 15H4v-2h16v2zm0-5H4V8h5.08L7 10.83 8.62 12 11 8.76l1-1.36 1 1.36L15.38 12 17 10.83 14.92 8H20v6z"/></svg>Подарки</button>
         <button data-drawer="new-group"><svg viewBox="0 0 24 24"><path d="M16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-8 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0 2c-2.3 0-7 1.2-7 3.5V19h14v-2.5C15 14.2 10.3 13 8 13zm8 0h-1c1.2.9 2 2 2 3.5V19h6v-2.5c0-2.3-4.7-3.5-7-3.5z"/></svg>Создать группу</button>
         <button data-drawer="saved"><svg viewBox="0 0 24 24"><path d="M17 3H7a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2z"/></svg>Избранное</button>
         <button data-drawer="archive"><svg viewBox="0 0 24 24"><path d="M20.5 5.2 19.1 3.5A1.5 1.5 0 0 0 18 3H6c-.5 0-.9.2-1.2.5L3.5 5.2C3.2 5.6 3 6 3 6.5V19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.5c0-.5-.2-.9-.5-1.3zM12 17.5 6.5 12H10v-2h4v2h3.5L12 17.5zM5.1 5l.8-1h12l.9 1H5.1z"/></svg>Архив</button>
         <button data-drawer="settings"><svg viewBox="0 0 24 24"><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.3 7.3 0 0 0-1.7-1L15 3h-4l-.4 2.9a7.3 7.3 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1c.5.4 1.1.7 1.7 1L11 21h4l.4-2.9c.6-.3 1.2-.6 1.7-1l2.5 1 2-3.5-2.2-1.6zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg>Настройки</button>
+        <button data-drawer="admin" id="drawerAdminBtn" class="hidden"><svg viewBox="0 0 24 24"><path d="M12 1 3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>Админ-панель</button>
         <label class="drawer-toggle">
             <svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9c0-.5 0-1-.1-1.4A5.4 5.4 0 0 1 12 4.9c0-.6.1-1.2.2-1.8L12 3z"/></svg>
             <span>Ночной режим</span>
@@ -256,19 +250,47 @@
     <div class="slide-panel-body" id="profileBody"></div>
 </nav>
 
+<!-- ===== ПАНЕЛЬ ПОДАРКОВ ===== -->
+<div class="slide-overlay hidden" id="giftsOverlay"></div>
+<nav class="slide-panel" id="giftsPanel" aria-hidden="true">
+    <header class="slide-panel-head">
+        <button id="giftsBackBtn" class="icon-btn hidden" aria-label="Назад">
+            <svg viewBox="0 0 24 24"><path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z"/></svg>
+        </button>
+        <h2 id="giftsTitle">Подарки</h2>
+        <button id="giftsCloseBtn" class="icon-btn" aria-label="Закрыть">
+            <svg viewBox="0 0 24 24"><path d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4l5.6 5.6L5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6z"/></svg>
+        </button>
+    </header>
+    <div class="slide-panel-body" id="giftsBody"></div>
+</nav>
+
+<!-- ===== АДМИН-ПАНЕЛЬ ===== -->
+<div class="slide-overlay hidden" id="adminOverlay"></div>
+<nav class="slide-panel" id="adminPanel" aria-hidden="true">
+    <header class="slide-panel-head">
+        <button id="adminBackBtn" class="icon-btn hidden" aria-label="Назад">
+            <svg viewBox="0 0 24 24"><path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z"/></svg>
+        </button>
+        <h2 id="adminTitle">Админ-панель</h2>
+        <button id="adminCloseBtn" class="icon-btn" aria-label="Закрыть">
+            <svg viewBox="0 0 24 24"><path d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4l5.6 5.6L5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6z"/></svg>
+        </button>
+    </header>
+    <div class="slide-panel-body" id="adminBody"></div>
+</nav>
+
 <!-- ===== ЭКРАН ЗВОНКА ===== -->
 <div class="call-screen hidden" id="callScreen">
     <div class="call-bg"></div>
     <video class="call-remote-video hidden" id="callRemoteVideo" autoplay playsinline></video>
     <audio id="callRemoteAudio" autoplay></audio>
     <video class="call-local-video hidden" id="callLocalVideo" autoplay playsinline muted></video>
-
     <div class="call-info-block" id="callInfoBlock">
         <div class="call-avatar-big" id="callAvatar"></div>
         <div class="call-name-big" id="callName">Имя</div>
         <div class="call-status-big" id="callStatus">Вызов…</div>
     </div>
-
     <div class="call-controls">
         <button class="call-ctrl" id="callMuteBtn" aria-label="Микрофон">
             <svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5.3-3c0 3-2.5 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.4 2.7 6.2 6 6.7V21h2v-3.3c3.3-.5 6-3.3 6-6.7h-1.7z"/></svg>
@@ -282,7 +304,6 @@
     </div>
 </div>
 
-<!-- ===== ВХОДЯЩИЙ ЗВОНОК ===== -->
 <div class="call-incoming hidden" id="callIncoming">
     <div class="call-incoming-bg"></div>
     <div class="call-incoming-content">
@@ -341,6 +362,8 @@
 <script src="messages.js"></script>
 <script src="composer.js"></script>
 <script src="calls.js"></script>
+<script src="gifts.js"></script>
+<script src="admin.js"></script>
 <script src="panels.js"></script>
 <script src="main.js"></script>
 </body>

@@ -14,6 +14,26 @@ let typingTimer = null;
 let lastTypingSent = 0;
 let recorder = null;
 
+/* ===== UPLOAD ===== */
+
+async function uploadFileToStorage(file, chatId) {
+    // Catbox.moe — бесплатно, без карты, до 200 МБ
+    const formData = new FormData();
+    formData.append("reqtype", "fileupload");
+    formData.append("fileToUpload", file);
+
+    const response = await fetch("https://catbox.moe/user/api.php", {
+        method: "POST",
+        body: formData,
+    });
+
+    if (!response.ok) throw new Error(`Ошибка загрузки (${response.status})`);
+    const url = (await response.text()).trim();
+    if (!url.startsWith("http")) throw new Error(`Неожиданный ответ: ${url}`);
+    console.log("[Upload] Файл загружен:", url);
+    return url;
+}
+
 /* ===== INPUT ===== */
 
 function autosizeInput() {
@@ -170,25 +190,33 @@ async function sendImages(files) {
 async function sendVideoFile(file) {
     const chatId = state.activeChatId;
     if (!chatId) return;
-    // Ограничение RTDB ~10МБ на запись. Base64 добавляет ~33%.
-    // Реалистичный лимит видеофайла — около 6 МБ.
-    if (file.size > 6 * 1048576) {
-        return toast("Видео слишком большое. Максимум ~6 МБ");
-    }
+    const MAX_SIZE = 200 * 1024 * 1024; // 200 МБ — лимит Catbox
+    if (file.size > MAX_SIZE) return toast("Максимальный размер видео — 200 МБ");
+
+    const btn = $("sendBtn");
+    const origMode = btn.dataset.mode;
+    btn.dataset.mode = "send";
+    btn.disabled = true;
+    toast("Загрузка видео…");
+
     try {
-        const data = await readAsDataURL(file);
-        if (data.length > 9_000_000) return toast("Видео слишком большое для отправки");
+        const url = await uploadFileToStorage(file, chatId);
         await pushMessage(chatId, {
             type: "videoFile",
-            data,
+            data: url,
             fileName: file.name || "video.mp4",
             fileSize: file.size,
             text: "",
             replyTo: state.replyTo || undefined,
         });
         cancelReplyEdit();
+        toast("Видео отправлено");
     } catch (error) {
+        console.error(error);
         toast(friendlyError(error));
+    } finally {
+        btn.disabled = false;
+        btn.dataset.mode = origMode;
     }
 }
 
@@ -196,7 +224,7 @@ async function sendFile(file) {
     if (!state.activeChatId) return;
     if (file.type.startsWith("image/")) return sendImages([file]);
     if (file.type.startsWith("video/")) return sendVideoFile(file);
-    if (file.size > 5 * 1048576) return toast("Максимальный размер файла — 5 МБ");
+    if (file.size > 100 * 1048576) return toast("Максимальный размер файла — 100 МБ");
     try {
         const data = await readAsDataURL(file);
         await pushMessage(state.activeChatId, { type: "file", data, fileName: file.name, fileSize: file.size, text: "", replyTo: state.replyTo || undefined });

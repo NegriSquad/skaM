@@ -9,6 +9,16 @@ function openChatMoreMenu() {
         { label: entry.pinnedAt ? "Открепить чат" : "Закрепить чат", icon: "pin", onClick: () => ref.update({ pinnedAt: entry.pinnedAt ? null : Date.now() }) },
         { label: entry.archived ? "Вернуть из архива" : "Архивировать", icon: "archive", onClick: () => ref.update({ archived: entry.archived ? null : true }) },
         entry.type === "group" ? { label: "Добавить участников", icon: "addUser", onClick: () => openAddMembers(chatId) } : null,
+        entry.type === "private" ? { label: "Подарить звёзды", icon: "star", onClick: () => {
+            const partner = partnerProfile || {
+                uid: entry.partnerId,
+                nickname: entry.partnerName,
+                username: entry.partnerUsername,
+                avatarUrl: entry.partnerAvatarUrl,
+            };
+            if (!partner.uid) return toast("Не удалось определить получателя");
+            openGiftsPanel({ uid: partner.uid, nickname: partner.nickname, username: partner.username, avatarUrl: partner.avatarUrl });
+        }} : null,
         "sep",
         entry.type !== "group" || entry.ownerId === state.user.uid ? { label: "Очистить историю", icon: "broom", danger: true, onClick: () => clearHistory(chatId) } : null,
         entry.type === "group"
@@ -38,34 +48,41 @@ async function clearHistory(chatId) {
 }
 
 function bindUI() {
+    // AUTH
     $("loginForm").addEventListener("submit", handleLogin);
     $("registerForm").addEventListener("submit", handleRegister);
     document.querySelectorAll("[data-auth-switch]").forEach((b) => b.addEventListener("click", () => showAuth(b.dataset.authSwitch)));
 
+    // DRAWER
     $("menuBtn").addEventListener("click", openDrawer);
     $("drawerOverlay").addEventListener("click", closeDrawer);
     $("drawer").addEventListener("click", (e) => {
         const action = e.target.closest("[data-drawer]")?.dataset.drawer;
         if (!action) return;
         if (action === "profile") openProfileEditor();
+        if (action === "gifts") openGiftsPanel();
         if (action === "new-group") openNewGroup();
         if (action === "saved") openSaved();
         if (action === "archive") { closeDrawer(); setFolder("archive"); }
         if (action === "settings") openSettings();
+        if (action === "admin") { closeDrawer(); openAdminPanel(); }
     });
     $("nightToggle").addEventListener("change", (e) => { state.settings.theme = e.target.checked ? "dark" : "light"; saveSettings(); });
 
+    // FOLDERS
     $("folders").addEventListener("click", (e) => {
         const folder = e.target.closest("[data-folder]")?.dataset.folder;
         if (folder) setFolder(folder);
     });
 
+    // SEARCH
     $("searchToggleBtn").addEventListener("click", openSearch);
     $("searchCloseBtn").addEventListener("click", closeSearch);
     const searchInput = $("searchInput");
     searchInput.addEventListener("input", renderSearch);
     searchInput.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSearch(); });
 
+    // FAB
     $("fabBtn").addEventListener("click", (e) => {
         e.stopPropagation();
         const menu = $("fabMenu");
@@ -83,6 +100,7 @@ function bindUI() {
         if (!e.target.closest(".fab-wrap")) { $("fabMenu").classList.add("hidden"); $("fabBtn").classList.remove("open"); }
     });
 
+    // CHAT
     $("chatBackBtn").addEventListener("click", closeChat);
     $("chatHeaderInfo").addEventListener("click", () => toggleInfoPanel(true));
     $("chatInfoBtn").addEventListener("click", () => toggleInfoPanel());
@@ -122,47 +140,68 @@ function bindUI() {
     }, { passive: true });
     $("scrollDownBtn").addEventListener("click", () => scrollToBottom(true));
 
+    // CONTEXT / MODAL / VIEWER
     $("ctxBackdrop").addEventListener("click", hideMenu);
     $("ctxBackdrop").addEventListener("contextmenu", (e) => { e.preventDefault(); hideMenu(); });
     $("modalCloseBtn").addEventListener("click", closeModal);
-    $("modalBackBtn").addEventListener("click", () => modalBackHandler?.());
+    $("modalBackBtn").addEventListener("click", () => { if (typeof modalBackHandler === "function" && modalBackHandler) modalBackHandler(); });
     $("modalOverlay").addEventListener("mousedown", (e) => { if (e.target === $("modalOverlay")) closeModal(); });
     $("mediaViewerClose").addEventListener("click", closeViewer);
     $("mediaViewer").addEventListener("click", (e) => { if (e.target === $("mediaViewer") || e.target === $("mediaViewerImg")) closeViewer(); });
 
-    $("settingsBackBtn").addEventListener("click", () => { if (typeof settingsBackHandler !== "undefined" && settingsBackHandler) settingsBackHandler(); else closeSettings(); });
+    // SETTINGS / PROFILE PANELS
+    $("settingsBackBtn").addEventListener("click", () => {
+        if (typeof settingsBackHandler === "function" && settingsBackHandler) settingsBackHandler();
+        else closeSettings();
+    });
     $("settingsCloseBtn").addEventListener("click", closeSettings);
     $("settingsOverlay").addEventListener("click", closeSettings);
     $("profileCloseBtn").addEventListener("click", closeProfilePanel);
     $("profileOverlay").addEventListener("click", closeProfilePanel);
 
-    // === ЗВОНКИ: подключаем, если calls.js загрузился ===
+    // CALLS
     if (typeof bindCallUI === "function") {
-        try {
-            bindCallUI();
-            console.log("[localgram] calls.js подключён ✓");
-        } catch (e) {
-            console.error("[localgram] bindCallUI error:", e);
-        }
-        auth.onAuthStateChanged((user) => {
-            if (user) {
-                setTimeout(() => {
-                    if (typeof initCallSystem === "function") initCallSystem();
-                }, 300);
-            } else {
-                if (typeof cleanupCallSystem === "function") cleanupCallSystem();
-            }
-        });
+        try { bindCallUI(); }
+        catch (e) { console.error("[localgram] bindCallUI error:", e); }
     } else {
         console.warn("[localgram] calls.js не загружен — звонки отключены");
     }
 
+    // GIFTS & ADMIN
+    if (typeof bindGiftsUI === "function") {
+        try { bindGiftsUI(); }
+        catch (e) { console.error("[localgram] bindGiftsUI error:", e); }
+    } else {
+        console.warn("[localgram] gifts.js не загружен");
+    }
+    if (typeof bindAdminUI === "function") {
+        try { bindAdminUI(); }
+        catch (e) { console.error("[localgram] bindAdminUI error:", e); }
+    } else {
+        console.warn("[localgram] admin.js не загружен");
+    }
+
+    // AUTH STATE — для звонков и звёзд
+    auth.onAuthStateChanged((user) => {
+        if (user) {
+            setTimeout(() => {
+                if (typeof initCallSystem === "function") initCallSystem();
+            }, 300);
+        } else {
+            if (typeof cleanupCallSystem === "function") cleanupCallSystem();
+            if (typeof offGiftsGroup === "function") offGiftsGroup();
+        }
+    });
+
+    // GLOBAL KEYBOARD
     document.addEventListener("keydown", (e) => {
         if (e.key !== "Escape") return;
         if (!$("ctxMenu").classList.contains("hidden")) return hideMenu();
         if (!$("mediaViewer").classList.contains("hidden")) return closeViewer();
         if (!$("modalOverlay").classList.contains("hidden")) return closeModal();
         if (!$("emojiPicker").classList.contains("hidden")) return $("emojiPicker").classList.add("hidden");
+        if ($("adminPanel")?.classList.contains("open")) return closeAdminPanel();
+        if ($("giftsPanel")?.classList.contains("open")) return closeGiftsPanel();
         if ($("settingsPanel").classList.contains("open")) return closeSettings();
         if ($("profilePanel").classList.contains("open")) return closeProfilePanel();
         if (!$("searchView").classList.contains("hidden")) return closeSearch();

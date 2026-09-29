@@ -66,6 +66,183 @@ function icon(name, cls) {
     return svg;
 }
 
+/* ===== VERIFIED BADGE ===== */
+
+const ADMIN_USERNAMES = new Set(["localgram"]);
+const DEFAULT_VERIFIED = ["localgram", "telegram", "support"];
+
+function isVerifiedUser(username) {
+    if (!username) return false;
+    const u = String(username).toLowerCase().replace(/^@/, "").trim();
+    if (state?.verifiedUsers?.has?.(u)) return true;
+    return DEFAULT_VERIFIED.includes(u);
+}
+
+function isAdminUser(username) {
+    if (!username) return false;
+    const u = String(username).toLowerCase().replace(/^@/, "").trim();
+    return ADMIN_USERNAMES.has(u);
+}
+
+/**
+ * Возвращает span-обёртку с SVG-галочкой.
+ * При наведении показывает системный tooltip «Аккаунт верифицирован».
+ */
+function verifiedBadge(size = 14) {
+    const wrap = document.createElement("span");
+    wrap.className = "verified-badge-wrap";
+    wrap.setAttribute("title", "Аккаунт верифицирован");
+    wrap.setAttribute("aria-label", "Аккаунт верифицирован");
+
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("width", size);
+    svg.setAttribute("height", size);
+    svg.setAttribute("class", "verified-badge");
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", "M12 1 9.79 3.21 6.68 3.13 5.86 6.14 3.13 7.72 4.13 10.71 2.86 13.68 5.28 15.72 5.28 18.86 8.28 19.72 9.79 22.45 12 21.09 14.21 22.45 15.72 19.72 18.72 18.86 18.72 15.72 21.14 13.68 19.87 10.71 20.87 7.72 18.14 6.14 17.32 3.13 14.21 3.21z M11 15.5 7.5 12l1.4-1.4 2.1 2.1 4.6-4.6 1.4 1.4z");
+    svg.appendChild(path);
+    wrap.appendChild(svg);
+    return wrap;
+}
+
+/* ===== COLOR HELPERS ===== */
+
+function hexToRgb(hex) {
+    if (!hex) return { r: 0, g: 0, b: 0 };
+    hex = String(hex).replace("#", "").trim();
+    if (hex.length === 3) hex = hex.split("").map((c) => c + c).join("");
+    const n = parseInt(hex, 16);
+    return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+function rgbToHex(r, g, b) {
+    const clamp = (v) => Math.max(0, Math.min(255, Math.round(v)));
+    return "#" + [r, g, b].map((v) => clamp(v).toString(16).padStart(2, "0")).join("");
+}
+
+function rgbToHsl(r, g, b) {
+    const rn = r / 255, gn = g / 255, bn = b / 255;
+    const max = Math.max(rn, gn, bn), min = Math.min(rn, gn, bn);
+    let hh = 0, ss = 0;
+    const ll = (max + min) / 2;
+    if (max !== min) {
+        const d = max - min;
+        ss = ll > 0.5 ? d / (2 - max - min) : d / (max + min);
+        if (max === rn) hh = (gn - bn) / d + (gn < bn ? 6 : 0);
+        else if (max === gn) hh = (bn - rn) / d + 2;
+        else hh = (rn - gn) / d + 4;
+        hh *= 60;
+    }
+    return { h: Math.round(hh), s: Math.round(ss * 100), l: ll };
+}
+
+function hexToHsl(hex) {
+    const { r, g, b } = hexToRgb(hex);
+    return rgbToHsl(r, g, b);
+}
+
+function shade(hex, amount) {
+    const { r, g, b } = hexToRgb(hex);
+    if (amount >= 0) {
+        return rgbToHex(r + (255 - r) * amount, g + (255 - g) * amount, b + (255 - b) * amount);
+    }
+    const k = 1 + amount;
+    return rgbToHex(r * k, g * k, b * k);
+}
+
+function luminance(hex) {
+    const { r, g, b } = hexToRgb(hex);
+    return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+}
+
+/**
+ * Применяет выбранный цвет как полную тему:
+ * фон, сайдбар, панели, чат, сообщения, акценты, границы, меню.
+ * Если hex пустой — снимает все inline-overrides, тема возвращается к дефолтной.
+ */
+function applyWallpaperColors(baseHex) {
+    const root = document.documentElement;
+    const VAR_NAMES = [
+        "--bg", "--panel", "--panel-2", "--hover", "--active", "--active-text",
+        "--chat-bg", "--in", "--out", "--out-text", "--out-meta", "--in-meta",
+        "--border", "--accent", "--accent-2", "--link", "--menu", "--system-bg",
+        "--danger", "--green", "--online", "--badge-muted",
+    ];
+
+    if (!baseHex) {
+        VAR_NAMES.forEach((k) => root.style.removeProperty(k));
+        return;
+    }
+
+    const { h: hue, s: sat, l: lum } = hexToHsl(baseHex);
+    const isDark = lum < 0.5;
+
+    const set = (name, val) => root.style.setProperty(name, val);
+    const hsl = (hh, ss, ll) => `hsl(${hh} ${Math.max(0, Math.min(100, ss))}% ${Math.max(0, Math.min(100, ll))}%)`;
+
+    if (isDark) {
+        const panelL   = Math.max(7,  Math.min(18, lum * 100 - 3));
+        const panel2L  = Math.max(11, Math.min(24, lum * 100 + 4));
+        const hoverL   = Math.max(13, Math.min(28, lum * 100 + 7));
+        const activeL  = Math.max(20, Math.min(45, lum * 100 + 15));
+        const inL      = Math.max(13, Math.min(30, lum * 100 + 6));
+        const outL     = Math.max(22, Math.min(50, lum * 100 + 18));
+        const accentL  = Math.max(45, Math.min(72, lum * 100 + 35));
+        const borderL  = Math.max(5,  Math.min(14, lum * 100 - 3));
+
+        set("--bg", baseHex);
+        set("--panel", hsl(hue, Math.min(sat, 35), panelL));
+        set("--panel-2", hsl(hue, Math.min(sat, 40), panel2L));
+        set("--hover", hsl(hue, Math.min(sat, 40), hoverL));
+        set("--active", hsl(hue, Math.min(sat, 60), activeL));
+        set("--active-text", "#ffffff");
+        set("--chat-bg", baseHex);
+        set("--in", hsl(hue, Math.min(sat, 45), inL));
+        set("--out", hsl(hue, Math.min(sat, 55), outL));
+        set("--out-text", "#ffffff");
+        set("--out-meta", hsl(hue, 40, 75));
+        set("--in-meta", hsl(hue, Math.min(sat, 20), 60));
+        set("--border", hsl(hue, Math.min(sat, 30), borderL));
+        set("--accent", hsl(hue, Math.min(sat, 70), accentL));
+        set("--accent-2", hsl(hue, Math.min(sat, 70), Math.min(75, accentL + 5)));
+        set("--link", hsl(hue, Math.min(sat, 70), Math.min(80, accentL + 10)));
+        set("--menu", `hsla(${hue}, ${Math.min(sat, 30)}%, ${Math.max(10, panelL + 2)}%, .96)`);
+        set("--system-bg", "rgba(0,0,0,.35)");
+        set("--badge-muted", hsl(hue, Math.min(sat, 30), Math.max(20, activeL)));
+    } else {
+        const bgL      = Math.max(94, Math.min(99, lum * 100 + 5));
+        const panel2L  = Math.max(88, Math.min(96, lum * 100 - 4));
+        const hoverL   = Math.max(86, Math.min(94, lum * 100 - 6));
+        const activeL  = Math.max(40, Math.min(60, lum * 100 - 15));
+        const outL     = Math.max(78, Math.min(90, lum * 100 - 10));
+        const accentL  = Math.max(38, Math.min(58, lum * 100 - 12));
+        const borderL  = Math.max(82, Math.min(92, lum * 100 - 15));
+
+        set("--bg", hsl(hue, Math.min(sat, 25), bgL));
+        set("--panel", "#ffffff");
+        set("--panel-2", hsl(hue, Math.min(sat, 25), panel2L));
+        set("--hover", hsl(hue, Math.min(sat, 25), hoverL));
+        set("--active", hsl(hue, Math.min(sat, 60), activeL));
+        set("--active-text", "#ffffff");
+        set("--chat-bg", baseHex);
+        set("--in", "#ffffff");
+        set("--out", hsl(hue, Math.min(sat, 55), outL));
+        set("--out-text", "#111111");
+        set("--out-meta", hsl(hue, 40, 45));
+        set("--in-meta", "#a0acb6");
+        set("--border", hsl(hue, Math.min(sat, 20), borderL));
+        set("--accent", hsl(hue, Math.min(sat, 70), accentL));
+        set("--accent-2", hsl(hue, Math.min(sat, 70), Math.max(35, accentL - 5)));
+        set("--link", hsl(hue, Math.min(sat, 70), Math.max(32, accentL - 10)));
+        set("--menu", `hsla(${hue}, ${Math.min(sat, 20)}%, 100%, .97)`);
+        set("--system-bg", "rgba(0,0,0,.25)");
+        set("--badge-muted", hsl(hue, Math.min(sat, 20), borderL));
+    }
+}
+
+/* ===== AVATAR ===== */
+
 const AVATAR_COLORS = [
     ["#ff885e", "#ff516a"], ["#ffcd6a", "#ffa85c"], ["#e0a2f3", "#d669ed"],
     ["#a0de7e", "#54cb68"], ["#53edd6", "#28c9b7"], ["#72d5fd", "#2a9ef1"], ["#82b1ff", "#665fff"],
@@ -115,6 +292,8 @@ function avatarEl(name, url, cls = "", opts = {}) {
     return setAvatar(h("span", { class: `avatar ${cls}`.trim(), "aria-hidden": "true" }), name, url, opts);
 }
 
+/* ===== TEXT ===== */
+
 function escapeHtml(str) {
     return String(str ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
@@ -138,6 +317,8 @@ function isEmojiOnly(text) {
     const count = typeof Intl.Segmenter === "function" ? [...new Intl.Segmenter().segment(t.replace(/\s/g, ""))].length : 1;
     return count <= 3;
 }
+
+/* ===== TIME / SIZE ===== */
 
 const pad = (n) => String(n).padStart(2, "0");
 function formatTime(ts) {
@@ -189,6 +370,8 @@ function plural(n, one, few, many) {
     return many;
 }
 
+/* ===== MISC ===== */
+
 function normalizeUsername(value) {
     return String(value || "").trim().replace(/^@/, "").toLowerCase();
 }
@@ -233,7 +416,9 @@ async function compressImage(file, maxSide = 1280, quality = 0.82) {
 
 function toast(text, ms = 2600) {
     const node = h("div", { class: "toast", text });
-    $("toastStack").appendChild(node);
+    const stack = $("toastStack");
+    if (!stack) { console.log("[toast]", text); return; }
+    stack.appendChild(node);
     setTimeout(() => node.remove(), ms);
 }
 
