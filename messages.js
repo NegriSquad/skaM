@@ -8,13 +8,24 @@ let currentAudio = null;
 /* ===== HELPERS ===== */
 
 function dataUrlToBlobUrl(dataUrl) {
+    if (typeof dataUrl !== "string") throw new Error("not a string");
     const comma = dataUrl.indexOf(",");
     if (comma < 0) throw new Error("bad data url");
     const meta = dataUrl.slice(0, comma);
-    const b64 = dataUrl.slice(comma + 1);
+    let b64 = dataUrl.slice(comma + 1);
     const mimeMatch = meta.match(/data:([^;]+)/);
-    const mime = mimeMatch ? mimeMatch[1] : "video/webm";
-    const bin = atob(b64);
+    const mime = mimeMatch ? mimeMatch[1] : "application/octet-stream";
+    const isBase64 = meta.indexOf(";base64") >= 0;
+    if (!isBase64) {
+        const text = decodeURIComponent(b64);
+        return URL.createObjectURL(new Blob([text], { type: mime }));
+    }
+    b64 = b64.replace(/\s/g, "");
+    if (b64.indexOf("%") >= 0) { try { b64 = decodeURIComponent(b64); } catch (e) {} }
+    b64 = b64.replace(/-/g, "+").replace(/_/g, "/");
+    while (b64.length % 4 !== 0) b64 += "=";
+    let bin;
+    try { bin = atob(b64); } catch (err) { throw new Error("atob failed: " + err.message); }
     const len = bin.length;
     const arr = new Uint8Array(len);
     for (let i = 0; i < len; i++) arr[i] = bin.charCodeAt(i);
@@ -22,11 +33,7 @@ function dataUrlToBlobUrl(dataUrl) {
 }
 
 function isVideoDataUrl(s) {
-    return typeof s === "string" && s.startsWith("data:video/");
-}
-
-function isExternalUrl(s) {
-    return typeof s === "string" && (s.startsWith("http://") || s.startsWith("https://"));
+    return typeof s === "string" && s.indexOf("data:video/") === 0;
 }
 
 /* ===== OPEN / CLOSE ===== */
@@ -41,11 +48,9 @@ function openChat(chatId) {
     const switching = state.activeChatId !== chatId;
     state.activeChatId = chatId;
     state.activeChat = entry;
-
     $("app").classList.add("chat-open");
     $("chatEmpty").classList.add("hidden");
     $("chatView").classList.remove("hidden");
-
     if (switching) {
         offGroup("chat");
         msgCache = new Map();
@@ -70,7 +75,6 @@ function openChat(chatId) {
             });
         }
     }
-
     renderChatHeader();
     renderPinnedBar();
     markChatRead(chatId);
@@ -102,14 +106,12 @@ function renderChatHeader() {
     const titleEl = $("chatTitle");
     titleEl.replaceChildren(h("span", { text: title }));
     if (entry.type === "private") {
-        const vUsername = partnerProfile && partnerProfile.username || entry.partnerUsername;
+        const vUsername = (partnerProfile && partnerProfile.username) || entry.partnerUsername;
         if (isVerifiedUser(vUsername)) titleEl.appendChild(verifiedBadge(15));
     }
-
     const av = $("chatAvatar");
     if (entry.type === "saved") setAvatar(av, "", "", { icon: "bookmark" });
-    else setAvatar(av, title, entry.type === "group" ? entry.avatarUrl : (partnerProfile && partnerProfile.avatarUrl) || entry.partnerAvatarUrl, { key: entry.partnerId || entry.title });
-
+    else setAvatar(av, title, entry.type === "group" ? entry.avatarUrl : ((partnerProfile && partnerProfile.avatarUrl) || entry.partnerAvatarUrl), { key: entry.partnerId || entry.title });
     const status = $("chatStatus");
     status.className = "";
     status.replaceChildren();
@@ -246,15 +248,12 @@ function renderMessages(opts) {
     const isGroup = entry && entry.type === "group";
     const uid = state.user.uid;
     const inner = h("div", { class: "messages-inner" });
-
     if (state.hasMore) inner.appendChild(h("button", { class: "tg-btn link small load-more", onclick: loadMoreMessages }, "Загрузить ранее"));
     if (!state.messages.length) {
         inner.appendChild(h("div", { class: "sys-msg" }, h("span", { text: entry && entry.type === "saved" ? "Сохраняйте сюда сообщения, заметки и файлы" : "Сообщений пока нет. Напишите первым!" })));
     }
-
     const nextCache = new Map();
     let lastDay = null;
-
     state.messages.forEach(function (m, i) {
         if (!lastDay || !sameDay(lastDay, m.timestamp)) {
             inner.appendChild(h("div", { class: "date-sep" }, h("span", { text: formatDay(m.timestamp) })));
@@ -269,7 +268,6 @@ function renderMessages(opts) {
         if (!node || node.dataset.sig !== sig) node = buildMessage(m, isGroup);
         node.dataset.sig = sig;
         nextCache.set(m.id, node);
-
         const prev = state.messages[i - 1];
         const next = state.messages[i + 1];
         const groupWith = function (o) {
@@ -283,10 +281,8 @@ function renderMessages(opts) {
         if (senderName) senderName.classList.toggle("hidden", groupWith(prev));
         inner.appendChild(node);
     });
-
     msgCache = nextCache;
     box.replaceChildren(inner);
-
     applyChatSearchMarks();
     const last = state.messages.length ? state.messages[state.messages.length - 1] : null;
     const newMsg = last && last.id !== opts.prevLast && !opts.initial;
@@ -325,6 +321,7 @@ function buildMessage(m, isGroup) {
         out && state.activeChat && state.activeChat.type !== "saved" ? icon(isMessageRead(m) ? "checks" : "check") : null);
 
     const hasText = !!(m.text && m.text.trim());
+
     if (m.type === "image") {
         const media = h("div", { class: "msg-media " + (hasText ? "" : "only"), onclick: function () { openViewer(m.data, m.text); } },
             h("img", { src: m.data, alt: m.text || "Фото", loading: "lazy" }));
@@ -344,6 +341,11 @@ function buildMessage(m, isGroup) {
         bubble.appendChild(buildGiftMessage(m));
         meta.classList.add("on-media");
         bubble.style.position = "relative";
+    } else if (m.type === "nft") {
+        bubble.classList.add("no-bg");
+        bubble.appendChild(buildNFTMessage(m));
+        meta.classList.add("on-media");
+        bubble.style.position = "relative";
     } else if (m.type === "file") {
         bubble.appendChild(h("a", { class: "file-msg", href: m.data, download: m.fileName || "file" },
             h("span", { class: "file-icon" }, icon("download")),
@@ -358,7 +360,7 @@ function buildMessage(m, isGroup) {
         text.appendChild(meta);
         bubble.appendChild(text);
         if (!m.type && isEmojiOnly(m.text)) bubble.classList.add("no-bg");
-    } else if (m.type !== "image" && m.type !== "videoFile" && m.type !== "gift") {
+    } else if (m.type !== "image" && m.type !== "videoFile" && m.type !== "gift" && m.type !== "nft") {
         bubble.appendChild(meta);
     }
 
@@ -367,42 +369,20 @@ function buildMessage(m, isGroup) {
         bubble.appendChild(h("div", { class: "reactions" }, reactions.map(function (pair) {
             const emoji = pair[0];
             const users = pair[1];
-            return h("button", {
-                class: "reaction " + (users[uid] ? "mine" : ""),
-                onclick: function (e) { e.stopPropagation(); toggleReaction(m, emoji); }
-            }, h("span", { class: "r-emoji", text: emoji }), Object.keys(users).length);
+            return h("button", { class: "reaction " + (users[uid] ? "mine" : ""), onclick: function (e) { e.stopPropagation(); toggleReaction(m, emoji); } },
+                h("span", { class: "r-emoji", text: emoji }), Object.keys(users).length);
         })));
     }
 
     row.appendChild(bubble);
     onLongPress(bubble, function (e) { openMessageMenu(m, e); });
     bubble.addEventListener("dblclick", function (e) {
-        if (!e.target.closest("a, button, video, .video-file, .gift-message")) setReply(m);
+        if (!e.target.closest("a, button, video, .video-file, .gift-message, .nft-message")) setReply(m);
     });
     return row;
 }
 
-function buildGiftMessage(m) {
-    const wrap = h("div", { class: "gift-message" });
-    const emoji = h("span", { class: "gift-message-emoji", text: m.giftEmoji || "🎁" });
-    const info = h("div", { class: "gift-message-info" },
-        h("strong", { text: "Подарок" }),
-        h("span", { text: m.giftName || "Подарок" }),
-        h("small", {}, "⭐ " + (m.giftPrice || 0).toLocaleString("ru-RU"))
-    );
-    wrap.append(emoji, info);
-    if (m.giftMessage) {
-        wrap.appendChild(h("em", { class: "gift-message-text", text: '"' + m.giftMessage + '"' }));
-    }
-    return wrap;
-}
-
-function isMessageRead(m) {
-    if (state.activeChat && state.activeChat.type === "group") {
-        return Object.keys(m.readBy || {}).some(function (k) { return k !== state.user.uid; });
-    }
-    return !!m.read;
-}
+/* ===== BUILD: VOICE ===== */
 
 function buildVoice(m) {
     const bars = 36;
@@ -426,7 +406,7 @@ function buildVoice(m) {
         if (audio) return audio;
         audio = new Audio(m.data);
         audio.addEventListener("timeupdate", function () {
-            const dur = audio.duration && isFinite(audio.duration) ? audio.duration : m.duration || 1;
+            const dur = audio.duration && isFinite(audio.duration) ? audio.duration : (m.duration || 1);
             paint(audio.currentTime / dur);
             time.textContent = formatDuration(audio.currentTime);
         });
@@ -438,57 +418,52 @@ function buildVoice(m) {
     btn.addEventListener("click", function (e) {
         e.stopPropagation();
         const a = ensure();
-        if (a.paused) {
-            if (currentAudio && currentAudio !== a) currentAudio.pause();
-            currentAudio = a;
-            a.play();
-        } else a.pause();
+        if (a.paused) { if (currentAudio && currentAudio !== a) currentAudio.pause(); currentAudio = a; a.play(); }
+        else a.pause();
     });
     wave.addEventListener("click", function (e) {
         e.stopPropagation();
         const a = ensure();
         const r = wave.getBoundingClientRect();
         const ratio = (e.clientX - r.left) / r.width;
-        const dur = a.duration && isFinite(a.duration) ? a.duration : m.duration || 0;
+        const dur = a.duration && isFinite(a.duration) ? a.duration : (m.duration || 0);
         a.currentTime = dur * ratio;
-        if (a.paused) {
-            if (currentAudio && currentAudio !== a) currentAudio.pause();
-            currentAudio = a;
-            a.play();
-        }
+        if (a.paused) { if (currentAudio && currentAudio !== a) currentAudio.pause(); currentAudio = a; a.play(); }
     });
     return h("div", { class: "voice" }, btn, h("span", { class: "voice-body" }, wave, time));
 }
 
-/* ===== КРУГЛОЕ ВИДЕО ===== */
+/* ===== BUILD: ROUND VIDEO ===== */
 
 function buildRoundVideo(m) {
     const wrap = h("div", { class: "round-video" });
-    const video = h("video", { playsinline: true, preload: "auto", muted: false, loop: false });
+    const video = h("video", { playsinline: true, preload: "metadata", muted: false, loop: false });
     const playIcon = h("span", { class: "rv-play" }, icon("play"));
     const timeEl = h("span", { class: "rv-time", text: formatDuration(m.duration) });
     const loadingEl = h("span", { class: "rv-loading hidden" });
+    const errorEl = h("span", { class: "rv-error hidden" }, "Ошибка");
 
-    wrap.append(video, playIcon, timeEl, loadingEl);
+    wrap.append(video, playIcon, timeEl, loadingEl, errorEl);
 
     let loaded = false;
     let blobUrl = null;
 
     const ensureLoaded = function () {
         if (loaded) return;
+        loaded = true;
         try {
-            if (isVideoDataUrl(m.data)) {
+            if (typeof m.data === "string" && (m.data.indexOf("http://") === 0 || m.data.indexOf("https://") === 0)) {
+                video.src = m.data;
+            } else if (isVideoDataUrl(m.data)) {
                 blobUrl = dataUrlToBlobUrl(m.data);
                 video.src = blobUrl;
             } else {
                 video.src = m.data;
             }
             video.load();
-            loaded = true;
         } catch (err) {
-            console.warn("[localgram] blob conversion failed, fallback:", err);
-            video.src = m.data;
-            loaded = true;
+            console.warn("[localgram] ensureLoaded failed:", err);
+            errorEl.classList.remove("hidden");
         }
     };
 
@@ -498,12 +473,14 @@ function buildRoundVideo(m) {
         if (video.paused) {
             if (currentAudio) currentAudio.pause();
             loadingEl.classList.remove("hidden");
+            errorEl.classList.add("hidden");
             try {
                 await video.play();
                 wrap.classList.add("playing");
             } catch (err) {
                 console.warn("[localgram] play error:", err);
-                toast("Не удалось воспроизвести видео");
+                errorEl.classList.remove("hidden");
+                setTimeout(function () { errorEl.classList.add("hidden"); }, 2000);
             } finally {
                 loadingEl.classList.add("hidden");
             }
@@ -515,12 +492,23 @@ function buildRoundVideo(m) {
 
     wrap.addEventListener("click", togglePlay);
     video.addEventListener("click", function (e) { e.stopPropagation(); });
-    video.addEventListener("ended", function () { wrap.classList.remove("playing"); video.currentTime = 0; timeEl.textContent = formatDuration(m.duration); });
-    video.addEventListener("timeupdate", function () { timeEl.textContent = formatDuration(video.currentTime || 0); });
+    video.addEventListener("ended", function () {
+        wrap.classList.remove("playing");
+        video.currentTime = 0;
+        timeEl.textContent = formatDuration(m.duration);
+    });
+    video.addEventListener("timeupdate", function () {
+        timeEl.textContent = formatDuration(video.currentTime || 0);
+    });
     video.addEventListener("loadedmetadata", function () {
         if (video.duration && isFinite(video.duration)) timeEl.textContent = formatDuration(video.duration);
+        else timeEl.textContent = formatDuration(m.duration);
     });
-    video.addEventListener("error", function () { console.warn("[localgram] video error:", video.error); });
+    video.addEventListener("error", function () {
+        console.warn("[localgram] video error:", video.error);
+        loadingEl.classList.add("hidden");
+        errorEl.classList.remove("hidden");
+    });
 
     const observer = new MutationObserver(function () {
         if (!document.body.contains(wrap)) {
@@ -533,22 +521,73 @@ function buildRoundVideo(m) {
     return wrap;
 }
 
-/* ===== ОБЫЧНОЕ ВИДЕО ===== */
+/* ===== BUILD: VIDEO FILE ===== */
 
 function buildVideoFile(m) {
     const video = h("video", { playsinline: true, preload: "metadata", controls: true });
     try {
         if (isVideoDataUrl(m.data)) video.src = dataUrlToBlobUrl(m.data);
         else video.src = m.data;
-    } catch (e) {
-        video.src = m.data;
-    }
+    } catch (e) { video.src = m.data; }
     return h("div", { class: "video-file" }, video);
+}
+
+/* ===== BUILD: GIFT ===== */
+
+function buildGiftMessage(m) {
+    const wrap = h("div", { class: "gift-message" });
+    const emoji = h("span", { class: "gift-message-emoji", text: m.giftEmoji || "🎁" });
+    const info = h("div", { class: "gift-message-info" },
+        h("strong", { text: "Подарок" }),
+        h("span", { text: m.giftName || "Подарок" }),
+        h("small", {}, "⭐ " + (m.giftPrice || 0).toLocaleString("ru-RU"))
+    );
+    wrap.append(emoji, info);
+    if (m.giftMessage) wrap.appendChild(h("em", { class: "gift-message-text", text: '"' + m.giftMessage + '"' }));
+    return wrap;
+}
+
+/* ===== BUILD: NFT ===== */
+
+function buildNFTMessage(m) {
+    const r = (typeof getRarity === "function") ? getRarity(m.nftRarity) : { id: "common", label: "Обычный", color: "#8a9aab" };
+    const wrap = h("div", { class: "nft-message rarity-" + r.id });
+
+    const imgWrap = h("div", { class: "nft-message-img-wrap" });
+    const img = h("img", {
+        class: "nft-message-img",
+        src: "pic_gift/" + m.nftId + "_" + m.nftRarity + ".png",
+        alt: m.nftName || "NFT",
+        onerror: function () { this.style.display = "none"; }
+    });
+    const emojiFallback = h("span", { class: "nft-message-emoji", text: m.nftEmoji || "🎁" });
+    imgWrap.append(img, emojiFallback);
+
+    const info = h("div", { class: "nft-message-info" },
+        h("div", { class: "nft-message-label" }, "NFT-подарок"),
+        h("div", { class: "nft-message-name", text: m.nftName || "NFT" }),
+        h("div", { class: "nft-message-rarity", style: "color:" + r.color, text: r.label }),
+        h("div", { class: "nft-message-serial", text: "№" + (m.nftSerial || "?") + "/" + (m.nftSupply || "?") }),
+        h("div", { class: "nft-message-price", text: "⭐ " + (m.nftPrice || 0).toLocaleString("ru-RU") })
+    );
+
+    wrap.append(imgWrap, info);
+    if (m.nftMessage) wrap.appendChild(h("em", { class: "nft-message-text", text: '"' + m.nftMessage + '"' }));
+    return wrap;
+}
+
+/* ===== MISC ===== */
+
+function isMessageRead(m) {
+    if (state.activeChat && state.activeChat.type === "group") {
+        return Object.keys(m.readBy || {}).some(function (k) { return k !== state.user.uid; });
+    }
+    return !!m.read;
 }
 
 function scrollToMessage(id) {
     const node = $("messages").querySelector('.msg[data-id="' + CSS.escape(id) + '"]');
-    if (!node) return toast("Сообщение не найдено в загруженной истории");
+    if (!node) return toast("Сообщение не найдено");
     node.scrollIntoView({ behavior: "smooth", block: "center" });
     node.classList.remove("highlight");
     void node.offsetWidth;
@@ -578,16 +617,13 @@ async function pushMessage(chatId, payload) {
     }, payload);
     Object.keys(msg).forEach(function (k) { if (msg[k] === undefined) delete msg[k]; });
     await db.ref("private_messages/" + chatId).push(msg);
-
     const preview = payload.type === "system" ? payload.text : previewOf(payload);
     const summary = { lastMessage: preview, lastTimestamp: now, lastSenderId: msg.senderId, lastSenderName: msg.senderName };
     await db.ref("user_chats/" + uid + "/" + chatId).update(Object.assign({}, summary, { readAt: now }));
-
     const others = chatMembers(entry, chatId).filter(function (m) { return m && m !== uid; });
     await Promise.all(others.map(function (other) {
         const extra = entry.type === "group" ? {} : {
-            type: "private",
-            partnerId: uid,
+            type: "private", partnerId: uid,
             partnerName: state.profile.nickname,
             partnerUsername: state.profile.username,
             partnerAvatarUrl: state.profile.avatarUrl || "",
@@ -595,7 +631,6 @@ async function pushMessage(chatId, payload) {
         };
         return db.ref("user_chats/" + other + "/" + chatId).update(Object.assign({}, extra, summary)).catch(function () {});
     }));
-
     if (entry.type === "private" && payload.type !== "system") {
         db.ref("notifications/" + entry.partnerId + "/" + chatId).set({
             senderId: uid, senderName: msg.senderName, message: preview, timestamp: now, read: false
@@ -624,7 +659,7 @@ function openMessageMenu(m, e) {
     const out = m.senderId === uid;
     const entry = state.activeChat;
     const pinned = entry && entry.pinnedMsg && entry.pinnedMsg.id === m.id;
-    const canEdit = out && !m.forwardedFrom && (m.type ? true : !!m.text) && m.type !== "voice" && m.type !== "video" && m.type !== "videoFile" && m.type !== "gift";
+    const canEdit = out && !m.forwardedFrom && (m.type ? true : !!m.text) && m.type !== "voice" && m.type !== "video" && m.type !== "videoFile" && m.type !== "gift" && m.type !== "nft";
 
     const reactRow = h("div", { class: "ctx-reactions" }, QUICK_REACTIONS.map(function (emoji) {
         return h("button", { "aria-label": "Реакция " + emoji, text: emoji, onclick: function () { hideMenu(); toggleReaction(m, emoji); } });
@@ -633,7 +668,7 @@ function openMessageMenu(m, e) {
     showMenu([
         { label: "Ответить", icon: "reply", onClick: function () { setReply(m); } },
         canEdit ? { label: "Изменить", icon: "edit", onClick: function () { setEdit(m); } } : null,
-        m.text ? { label: "Копировать текст", icon: "copy", onClick: function () { navigator.clipboard.writeText(m.text).then(function () { toast("Текст скопирован"); }); } } : null,
+        m.text ? { label: "Копировать", icon: "copy", onClick: function () { navigator.clipboard.writeText(m.text).then(function () { toast("Скопировано"); }); } } : null,
         { label: pinned ? "Открепить" : "Закрепить", icon: "pin", onClick: function () { togglePin(m); } },
         { label: "Переслать", icon: "forward", onClick: function () { openForward(m); } },
         entry && entry.type !== "saved" ? { label: "В избранное", icon: "bookmark", onClick: function () { saveToFavorites(m); } } : null,
@@ -656,8 +691,7 @@ async function toggleReaction(m, emoji) {
     const updates = {};
     const had = m.reactions && m.reactions[emoji] && m.reactions[emoji][uid];
     Object.entries(m.reactions || {}).forEach(function (pair) {
-        const e = pair[0];
-        const users = pair[1];
+        const e = pair[0]; const users = pair[1];
         if (users && users[uid]) updates[base + "/" + e + "/" + uid] = null;
     });
     if (!had) updates[base + "/" + emoji + "/" + uid] = true;
@@ -675,10 +709,8 @@ async function togglePin(m) {
         if (!pinned && state.activeChat.type === "group") {
             await pushMessage(chatId, { type: "system", text: state.profile.nickname + " закрепил(а) сообщение" });
         }
-        toast(pinned ? "Сообщение откреплено" : "Сообщение закреплено");
-    } catch (error) {
-        toast(friendlyError(error));
-    }
+        toast(pinned ? "Откреплено" : "Закреплено");
+    } catch (error) { toast(friendlyError(error)); }
 }
 
 async function deleteMessage(m) {
@@ -688,9 +720,8 @@ async function deleteMessage(m) {
     const res = await confirmDialog({
         title: "Удалить сообщение",
         text: "Вы точно хотите удалить это сообщение?",
-        ok: "Удалить",
-        danger: true,
-        checkbox: canForAll && entry.type !== "saved" ? (entry.type === "group" ? "Удалить для всех участников" : "Также удалить для " + chatTitle(entry)) : null,
+        ok: "Удалить", danger: true,
+        checkbox: canForAll && entry.type !== "saved" ? (entry.type === "group" ? "Удалить для всех" : "Также удалить у " + chatTitle(entry)) : null,
     });
     if (!res) return;
     const chatId = state.activeChatId;
@@ -705,9 +736,7 @@ async function deleteMessage(m) {
             }));
         }
         if (isLast) await refreshLastMessage(chatId, forAll);
-    } catch (error) {
-        toast(friendlyError(error));
-    }
+    } catch (error) { toast(friendlyError(error)); }
 }
 
 async function saveToFavorites(m) {
@@ -723,17 +752,13 @@ async function saveToFavorites(m) {
 
 function forwardPayload(m) {
     return {
-        type: m.type || undefined,
-        text: m.text || "",
-        data: m.data,
-        fileName: m.fileName,
-        fileSize: m.fileSize,
-        duration: m.duration,
-        giftId: m.giftId,
-        giftEmoji: m.giftEmoji,
-        giftName: m.giftName,
-        giftPrice: m.giftPrice,
-        giftMessage: m.giftMessage,
+        type: m.type || undefined, text: m.text || "",
+        data: m.data, fileName: m.fileName, fileSize: m.fileSize, duration: m.duration,
+        giftId: m.giftId, giftEmoji: m.giftEmoji, giftName: m.giftName, giftPrice: m.giftPrice, giftMessage: m.giftMessage,
+        nftItemId: m.nftItemId, nftId: m.nftId, nftName: m.nftName, nftEmoji: m.nftEmoji,
+        nftRarity: m.nftRarity, nftRarityId: m.nftRarityId, nftRarityLabel: m.nftRarityLabel,
+        nftRarityColor: m.nftRarityColor, nftSerial: m.nftSerial, nftSupply: m.nftSupply,
+        nftPrice: m.nftPrice, nftMessage: m.nftMessage,
         forwardedFrom: m.forwardedFrom || (m.senderId === state.user.uid ? state.profile.nickname : m.senderName || chatTitle(state.activeChat)),
     };
 }
@@ -745,15 +770,14 @@ function openForward(m) {
         const q = search.value.trim().toLowerCase();
         const items = sortedChats(function (id, e) { return chatTitle(e).toLowerCase().includes(q); });
         list.replaceChildren.apply(list, items.map(function (pair) {
-            const id = pair[0];
-            const e = pair[1];
+            const id = pair[0]; const e = pair[1];
             return h("button", {
                 class: "pick-row",
                 onclick: async function () {
                     try {
                         await pushMessage(id, forwardPayload(m));
                         closeModal();
-                        toast("Сообщение переслано");
+                        toast("Переслано");
                         openChat(id);
                     } catch (error) { toast(friendlyError(error)); }
                 },
@@ -768,11 +792,7 @@ function openForward(m) {
 
 /* ===== IN-CHAT SEARCH ===== */
 
-function openChatSearch() {
-    $("chatSearch").classList.remove("hidden");
-    $("chatSearchInput").focus();
-}
-
+function openChatSearch() { $("chatSearch").classList.remove("hidden"); $("chatSearchInput").focus(); }
 function closeChatSearch() {
     $("chatSearch").classList.add("hidden");
     $("chatSearchInput").value = "";
@@ -780,7 +800,6 @@ function closeChatSearch() {
     $("chatSearchCount").textContent = "";
     applyChatSearchMarks();
 }
-
 function runChatSearch() {
     const q = $("chatSearchInput").value.trim().toLowerCase();
     chatSearch.query = q;
@@ -790,19 +809,15 @@ function runChatSearch() {
     chatSearch.index = chatSearch.hits.length - 1;
     applyChatSearchMarks(true);
 }
-
 function stepChatSearch(dir) {
     if (!chatSearch.hits.length) return;
     chatSearch.index = (chatSearch.index + dir + chatSearch.hits.length) % chatSearch.hits.length;
     applyChatSearchMarks(true);
 }
-
 function applyChatSearchMarks(scroll) {
     const box = $("messages");
     box.querySelectorAll(".search-hit, .search-current").forEach(function (n) { n.classList.remove("search-hit", "search-current"); });
-    const hits = chatSearch.hits;
-    const index = chatSearch.index;
-    const query = chatSearch.query;
+    const hits = chatSearch.hits; const index = chatSearch.index; const query = chatSearch.query;
     $("chatSearchCount").textContent = query ? (hits.length ? (index + 1) + " из " + hits.length : "Нет") : "";
     hits.forEach(function (id, i) {
         const node = box.querySelector('.msg[data-id="' + CSS.escape(id) + '"]');
