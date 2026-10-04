@@ -15,11 +15,8 @@ const ICE_CONFIG = {
     iceCandidatePoolSize: 10,
 };
 
-// ===== НАСТРОЙКИ РИНГТОНОВ =====
-// Положите файлы ringtone.mp3 и ringback.mp3 в корень проекта (рядом с index.html).
-// Если файлов нет — сработает fallback (синтезированный писк).
-const RINGTONE_FILE = "ringtone.mp3";   // входящий звонок
-const RINGBACK_FILE = "ringback.mp3";   // гудки для звонящего
+const RINGTONE_FILE = "ringtone.mp3";
+const RINGBACK_FILE = "ringback.mp3";
 const RINGTONE_VOLUME = 0.7;
 const RINGBACK_VOLUME = 0.5;
 
@@ -35,17 +32,17 @@ let ringtoneAudio = null;
 let ringbackAudio = null;
 
 /* =====================================================
-   RINGTONE (audio files + fallback beep)
+   RINGTONE
    ===================================================== */
 
-function startRingtone(fileName = RINGTONE_FILE) {
+function startRingtone(fileName) {
     try {
         stopRingtone();
-        ringtoneAudio = new Audio(fileName);
+        ringtoneAudio = new Audio(fileName || RINGTONE_FILE);
         ringtoneAudio.loop = true;
         ringtoneAudio.volume = RINGTONE_VOLUME;
-        ringtoneAudio.play().catch((err) => {
-            console.warn("[CALLS] Не удалось воспроизвести рингтон, fallback beep:", err.message);
+        ringtoneAudio.play().catch(function (err) {
+            console.warn("[CALLS] ringtone fallback:", err.message);
             fallbackBeep();
         });
     } catch (e) {
@@ -54,15 +51,14 @@ function startRingtone(fileName = RINGTONE_FILE) {
     }
 }
 
-function startRingback(fileName = RINGBACK_FILE) {
+function startRingback(fileName) {
     try {
         stopRingtone();
-        ringbackAudio = new Audio(fileName);
+        ringbackAudio = new Audio(fileName || RINGBACK_FILE);
         ringbackAudio.loop = true;
         ringbackAudio.volume = RINGBACK_VOLUME;
-        ringbackAudio.play().catch((err) => {
-            console.warn("[CALLS] Не удалось воспроизвести ringback:", err.message);
-            // Не включаем fallback для гудков — тишина лучше писка
+        ringbackAudio.play().catch(function (err) {
+            console.warn("[CALLS] ringback error:", err.message);
         });
     } catch (e) {
         console.warn("[CALLS] ringback error:", e);
@@ -71,22 +67,22 @@ function startRingback(fileName = RINGBACK_FILE) {
 
 function stopRingtone() {
     if (ringtoneAudio) {
-        try { ringtoneAudio.pause(); ringtoneAudio.currentTime = 0; } catch {}
+        try { ringtoneAudio.pause(); ringtoneAudio.currentTime = 0; } catch (e) {}
         ringtoneAudio = null;
     }
     if (ringbackAudio) {
-        try { ringbackAudio.pause(); ringbackAudio.currentTime = 0; } catch {}
+        try { ringbackAudio.pause(); ringbackAudio.currentTime = 0; } catch (e) {}
         ringbackAudio = null;
     }
     if (callRingInterval) { clearInterval(callRingInterval); callRingInterval = null; }
-    if (callRingCtx) { try { callRingCtx.close(); } catch {} callRingCtx = null; }
+    if (callRingCtx) { try { callRingCtx.close(); } catch (e) {} callRingCtx = null; }
 }
 
 function fallbackBeep() {
     try {
         const Ctx = window.AudioContext || window.webkitAudioContext;
         callRingCtx = new Ctx();
-        const beep = () => {
+        const beep = function () {
             if (!callRingCtx) return;
             try {
                 const osc = callRingCtx.createOscillator();
@@ -119,54 +115,46 @@ function initCallSystem() {
     if (!auth || !state.user) return;
     callSystemInitialized = true;
 
-    userCallRef = db.ref(`user_calls/${state.user.uid}`);
+    userCallRef = db.ref("user_calls/" + state.user.uid);
 
-    const onAdded = userCallRef.on("child_added", (snap) => {
+    const onAdded = userCallRef.on("child_added", function (snap) {
         const call = snap.val();
         if (!call) return;
-
-        if (Date.now() - (call.createdAt || 0) > 60000) {
-            snap.ref.remove();
-            return;
-        }
+        if (Date.now() - (call.createdAt || 0) > 60000) { snap.ref.remove(); return; }
         if (call.status !== "ringing") return;
 
         if (activeCall) {
-            db.ref(`calls/${call.chatId}/status`).set("busy").catch(() => {});
+            db.ref("calls/" + call.chatId + "/status").set("busy").catch(function () {});
             snap.ref.remove();
             return;
         }
         if (incomingCallData && incomingCallData.chatId === call.chatId) return;
 
-        showIncomingCall({ id: snap.key, ...call });
+        showIncomingCall(Object.assign({ id: snap.key }, call));
     });
 
-    const onChanged = userCallRef.on("child_changed", (snap) => {
+    const onChanged = userCallRef.on("child_changed", function (snap) {
         const call = snap.val();
         if (!call) return;
         if (incomingCallData && incomingCallData.id === snap.key) {
-            if (["ended", "rejected", "missed", "busy"].includes(call.status)) {
-                hideIncomingCall();
-            }
+            if (["ended", "rejected", "missed", "busy"].indexOf(call.status) >= 0) hideIncomingCall();
         }
     });
 
-    const onRemoved = userCallRef.on("child_removed", (snap) => {
-        if (incomingCallData && incomingCallData.id === snap.key) {
-            hideIncomingCall();
-        }
+    const onRemoved = userCallRef.on("child_removed", function (snap) {
+        if (incomingCallData && incomingCallData.id === snap.key) hideIncomingCall();
     });
 
     userCallHandlers = [
-        () => userCallRef.off("child_added", onAdded),
-        () => userCallRef.off("child_changed", onChanged),
-        () => userCallRef.off("child_removed", onRemoved),
+        function () { userCallRef.off("child_added", onAdded); },
+        function () { userCallRef.off("child_changed", onChanged); },
+        function () { userCallRef.off("child_removed", onRemoved); },
     ];
 }
 
 function cleanupCallSystem() {
     if (!callSystemInitialized) return;
-    userCallHandlers.forEach((fn) => { try { fn(); } catch {} });
+    userCallHandlers.forEach(function (fn) { try { fn(); } catch (e) {} });
     userCallHandlers = [];
     userCallRef = null;
     callSystemInitialized = false;
@@ -190,6 +178,7 @@ function callUI() {
         status: $("callStatus"),
         muteBtn: $("callMuteBtn"),
         videoBtn: $("callVideoBtn"),
+        flipBtn: $("callFlipBtn"),
         endBtn: $("callEndBtn"),
         incoming: $("callIncoming"),
         incomingAvatar: $("callIncomingAvatar"),
@@ -205,15 +194,80 @@ function resetCallScreenUI() {
     if (!ui.screen) return;
     ui.screen.classList.add("hidden");
     ui.screen.classList.remove("video-mode", "audio-mode");
-    ui.remoteVideo.srcObject = null;
-    ui.localVideo.srcObject = null;
-    ui.remoteAudio.srcObject = null;
+    if (ui.remoteVideo) ui.remoteVideo.srcObject = null;
+    if (ui.localVideo) ui.localVideo.srcObject = null;
+    if (ui.remoteAudio) ui.remoteAudio.srcObject = null;
     ui.remoteVideo.classList.add("hidden");
     ui.localVideo.classList.add("hidden");
     ui.infoBlock.classList.remove("hidden");
     ui.muteBtn.classList.remove("active");
     ui.videoBtn.classList.remove("active");
+    if (ui.flipBtn) ui.flipBtn.classList.remove("loading");
     document.body.classList.remove("in-call");
+}
+
+/* =====================================================
+   SWITCH CAMERA (front / back)
+   ===================================================== */
+
+async function switchCamera() {
+    if (!activeCall) return;
+    if (activeCall.type !== "video") return;
+
+    const videoTracks = activeCall.stream.getVideoTracks();
+    if (!videoTracks.length) {
+        return toast("Нет видеотрека для переключения");
+    }
+
+    const currentMode = activeCall.facingMode || "user";
+    const newMode = currentMode === "user" ? "environment" : "user";
+    const newLabel = newMode === "user" ? "фронтальная" : "задняя";
+
+    const flipBtn = $("callFlipBtn");
+    if (flipBtn) flipBtn.classList.add("loading");
+
+    try {
+        await videoTracks[0].applyConstraints({ facingMode: newMode });
+        activeCall.facingMode = newMode;
+        toast("Камера: " + newLabel);
+    } catch (e1) {
+        console.warn("[calls] applyConstraints failed:", e1.message);
+
+        try {
+            const newStream = await navigator.mediaDevices.getUserMedia({
+                audio: false,
+                video: {
+                    facingMode: { ideal: newMode },
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                },
+            });
+
+            const newTrack = newStream.getVideoTracks()[0];
+            if (!newTrack) throw new Error("no video track in new stream");
+
+            const sender = activeCall.pc.getSenders().find(function (s) {
+                return s.track && s.track.kind === "video";
+            });
+            if (sender) await sender.replaceTrack(newTrack);
+
+            const oldTrack = videoTracks[0];
+            try { activeCall.stream.removeTrack(oldTrack); } catch (e) {}
+            activeCall.stream.addTrack(newTrack);
+            try { oldTrack.stop(); } catch (e) {}
+
+            const localVideo = $("callLocalVideo");
+            if (localVideo) localVideo.srcObject = activeCall.stream;
+
+            activeCall.facingMode = newMode;
+            toast("Камера: " + newLabel);
+        } catch (e2) {
+            console.error("[calls] switch camera failed:", e2);
+            toast("Не удалось переключить камеру");
+        }
+    } finally {
+        if (flipBtn) flipBtn.classList.remove("loading");
+    }
 }
 
 /* =====================================================
@@ -235,7 +289,7 @@ async function startCall(type) {
         stream = await navigator.mediaDevices.getUserMedia({
             audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
             video: type === "video"
-                ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" }
+                ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: { ideal: "user" } }
                 : false,
         });
     } catch (e) {
@@ -246,48 +300,49 @@ async function startCall(type) {
     }
 
     const pc = new RTCPeerConnection(ICE_CONFIG);
-    stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+    stream.getTracks().forEach(function (t) { pc.addTrack(t, stream); });
 
     activeCall = {
-        chatId,
+        chatId: chatId,
         partnerId: entry.partnerId,
         partnerName: chatTitle(entry),
         partnerAvatar: entry.partnerAvatarUrl || "",
-        type,
+        type: type,
         role: "caller",
-        stream,
-        pc,
+        stream: stream,
+        pc: pc,
         startedAt: null,
         connected: false,
         muted: false,
         videoOff: false,
+        facingMode: "user",
         timerInterval: null,
         cleanup: [],
     };
 
     showActiveCallUI();
-    startRingback(); // ← ГУДКИ для звонящего
+    startRingback();
 
-    const callerCandsRef = db.ref(`calls/${chatId}/callerCandidates`);
-    pc.onicecandidate = (e) => {
-        if (e.candidate) callerCandsRef.push(e.candidate.toJSON()).catch(() => {});
+    const callerCandsRef = db.ref("calls/" + chatId + "/callerCandidates");
+    pc.onicecandidate = function (e) {
+        if (e.candidate) callerCandsRef.push(e.candidate.toJSON()).catch(function () {});
     };
 
-    pc.ontrack = (e) => {
+    pc.ontrack = function (e) {
         const remoteStream = e.streams[0];
         const ui = callUI();
         if (type === "video") {
             ui.remoteVideo.srcObject = remoteStream;
-            ui.remoteVideo.play().catch(() => {});
+            ui.remoteVideo.play().catch(function () {});
         }
         ui.remoteAudio.srcObject = remoteStream;
-        ui.remoteAudio.play().catch(() => {});
+        ui.remoteAudio.play().catch(function () {});
     };
 
-    pc.onconnectionstatechange = () => {
+    pc.onconnectionstatechange = function () {
         if (!activeCall) return;
         if (pc.connectionState === "connected") {
-            stopRingtone(); // ← ОСТАНОВИТЬ ГУДКИ
+            stopRingtone();
             if (!activeCall.connected) {
                 activeCall.connected = true;
                 activeCall.startedAt = Date.now();
@@ -302,29 +357,29 @@ async function startCall(type) {
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
 
-    await db.ref(`calls/${chatId}`).set({
+    await db.ref("calls/" + chatId).set({
         caller: state.user.uid,
         callerName: state.profile.nickname,
         callerAvatar: state.profile.avatarUrl || "",
         callee: entry.partnerId,
-        type,
+        type: type,
         status: "ringing",
         offer: { sdp: offer.sdp, type: offer.type },
         createdAt: Date.now(),
     });
 
-    await db.ref(`user_calls/${entry.partnerId}/${chatId}`).set({
-        chatId,
+    await db.ref("user_calls/" + entry.partnerId + "/" + chatId).set({
+        chatId: chatId,
         callerId: state.user.uid,
         callerName: state.profile.nickname,
         callerAvatar: state.profile.avatarUrl || "",
-        type,
+        type: type,
         status: "ringing",
         createdAt: Date.now(),
     });
 
-    const answerRef = db.ref(`calls/${chatId}/answer`);
-    const onAnswer = answerRef.on("value", async (snap) => {
+    const answerRef = db.ref("calls/" + chatId + "/answer");
+    const onAnswer = answerRef.on("value", async function (snap) {
         const answer = snap.val();
         if (!answer || !activeCall || activeCall.role !== "caller") return;
         if (pc.signalingState === "have-local-offer") {
@@ -335,10 +390,10 @@ async function startCall(type) {
             }
         }
     });
-    activeCall.cleanup.push(() => answerRef.off("value", onAnswer));
+    activeCall.cleanup.push(function () { answerRef.off("value", onAnswer); });
 
-    const calleeCandsRef = db.ref(`calls/${chatId}/calleeCandidates`);
-    const onCalleeCand = calleeCandsRef.on("child_added", async (snap) => {
+    const calleeCandsRef = db.ref("calls/" + chatId + "/calleeCandidates");
+    const onCalleeCand = calleeCandsRef.on("child_added", async function (snap) {
         if (!activeCall || activeCall.role !== "caller") return;
         try {
             await pc.addIceCandidate(new RTCIceCandidate(snap.val()));
@@ -346,10 +401,10 @@ async function startCall(type) {
             console.warn("[CALLS] addIceCandidate(callee):", e);
         }
     });
-    activeCall.cleanup.push(() => calleeCandsRef.off("child_added", onCalleeCand));
+    activeCall.cleanup.push(function () { calleeCandsRef.off("child_added", onCalleeCand); });
 
-    const statusRef = db.ref(`calls/${chatId}/status`);
-    const onStatus = statusRef.on("value", (snap) => {
+    const statusRef = db.ref("calls/" + chatId + "/status");
+    const onStatus = statusRef.on("value", function (snap) {
         const s = snap.val();
         if (!activeCall) return;
         if (s === "rejected") { toast("Звонок отклонён"); endCall(true); }
@@ -357,11 +412,11 @@ async function startCall(type) {
         else if (s === "missed") { toast("Нет ответа"); endCall(true); }
         else if (s === "ended" || s === null) { endCall(true); }
     });
-    activeCall.cleanup.push(() => statusRef.off("value", onStatus));
+    activeCall.cleanup.push(function () { statusRef.off("value", onStatus); });
 
-    callTimeoutTimer = setTimeout(() => {
+    callTimeoutTimer = setTimeout(function () {
         if (activeCall && activeCall.role === "caller" && !activeCall.startedAt) {
-            db.ref(`calls/${chatId}/status`).set("missed").catch(() => {});
+            db.ref("calls/" + chatId + "/status").set("missed").catch(function () {});
             toast("Нет ответа");
             endCall(true);
         }
@@ -410,10 +465,8 @@ function showIncomingCall(call) {
     startRingtone();
 
     clearTimeout(callTimeoutTimer);
-    callTimeoutTimer = setTimeout(() => {
-        if (incomingCallData && incomingCallData.id === call.id) {
-            rejectIncomingCall(true);
-        }
+    callTimeoutTimer = setTimeout(function () {
+        if (incomingCallData && incomingCallData.id === call.id) rejectIncomingCall(true);
     }, 45000);
 }
 
@@ -432,7 +485,7 @@ async function acceptIncomingCall() {
     hideIncomingCall();
     stopRingtone();
 
-    const snap = await db.ref(`calls/${call.chatId}`).once("value");
+    const snap = await db.ref("calls/" + call.chatId).once("value");
     const callData = snap.val();
     if (!callData || callData.status !== "ringing") {
         toast("Звонок уже завершён");
@@ -446,56 +499,55 @@ async function acceptIncomingCall() {
         stream = await navigator.mediaDevices.getUserMedia({
             audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
             video: type === "video"
-                ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" }
+                ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: { ideal: "user" } }
                 : false,
         });
     } catch (e) {
         console.error("[CALLS] getUserMedia failed:", e);
-        db.ref(`calls/${call.chatId}/status`).set("rejected").catch(() => {});
+        db.ref("calls/" + call.chatId + "/status").set("rejected").catch(function () {});
         toast("Не удалось получить доступ к камере/микрофону");
         return;
     }
 
     const pc = new RTCPeerConnection(ICE_CONFIG);
-    stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+    stream.getTracks().forEach(function (t) { pc.addTrack(t, stream); });
 
     activeCall = {
         chatId: call.chatId,
         partnerId: callData.caller,
         partnerName: callData.callerName,
         partnerAvatar: callData.callerAvatar || "",
-        type,
+        type: type,
         role: "callee",
-        stream,
-        pc,
+        stream: stream,
+        pc: pc,
         startedAt: null,
         connected: false,
         muted: false,
         videoOff: false,
+        facingMode: "user",
         timerInterval: null,
         cleanup: [],
     };
 
     showActiveCallUI();
 
-    pc.onicecandidate = (e) => {
-        if (e.candidate) {
-            db.ref(`calls/${call.chatId}/calleeCandidates`).push(e.candidate.toJSON()).catch(() => {});
-        }
+    pc.onicecandidate = function (e) {
+        if (e.candidate) db.ref("calls/" + call.chatId + "/calleeCandidates").push(e.candidate.toJSON()).catch(function () {});
     };
 
-    pc.ontrack = (e) => {
+    pc.ontrack = function (e) {
         const remoteStream = e.streams[0];
         const ui = callUI();
         if (type === "video") {
             ui.remoteVideo.srcObject = remoteStream;
-            ui.remoteVideo.play().catch(() => {});
+            ui.remoteVideo.play().catch(function () {});
         }
         ui.remoteAudio.srcObject = remoteStream;
-        ui.remoteAudio.play().catch(() => {});
+        ui.remoteAudio.play().catch(function () {});
     };
 
-    pc.onconnectionstatechange = () => {
+    pc.onconnectionstatechange = function () {
         if (!activeCall) return;
         if (pc.connectionState === "connected") {
             stopRingtone();
@@ -518,40 +570,40 @@ async function acceptIncomingCall() {
         return;
     }
 
-    const callerCandsRef = db.ref(`calls/${call.chatId}/callerCandidates`);
-    const onCallerCand = callerCandsRef.on("child_added", async (s) => {
+    const callerCandsRef = db.ref("calls/" + call.chatId + "/callerCandidates");
+    const onCallerCand = callerCandsRef.on("child_added", async function (s) {
         try {
             await pc.addIceCandidate(new RTCIceCandidate(s.val()));
         } catch (e) {
             console.warn("[CALLS] addIceCandidate(caller):", e);
         }
     });
-    activeCall.cleanup.push(() => callerCandsRef.off("child_added", onCallerCand));
+    activeCall.cleanup.push(function () { callerCandsRef.off("child_added", onCallerCand); });
 
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
 
-    await db.ref(`calls/${call.chatId}/answer`).set({ sdp: answer.sdp, type: answer.type });
-    await db.ref(`calls/${call.chatId}/status`).set("accepted");
+    await db.ref("calls/" + call.chatId + "/answer").set({ sdp: answer.sdp, type: answer.type });
+    await db.ref("calls/" + call.chatId + "/status").set("accepted");
 
-    const statusRef = db.ref(`calls/${call.chatId}/status`);
-    const onStatus = statusRef.on("value", (snap) => {
+    const statusRef = db.ref("calls/" + call.chatId + "/status");
+    const onStatus = statusRef.on("value", function (snap) {
         const s = snap.val();
         if (!activeCall) return;
         if (s === "ended" || s === "rejected" || s === "missed" || s === null) endCall(true);
     });
-    activeCall.cleanup.push(() => statusRef.off("value", onStatus));
+    activeCall.cleanup.push(function () { statusRef.off("value", onStatus); });
 }
 
-async function rejectIncomingCall(silent = false) {
+async function rejectIncomingCall(silent) {
     if (!incomingCallData) return;
     const call = incomingCallData;
     hideIncomingCall();
     stopRingtone();
     try {
-        await db.ref(`calls/${call.chatId}/status`).set("rejected");
-        await db.ref(`user_calls/${state.user.uid}/${call.chatId}`).remove();
-    } catch {}
+        await db.ref("calls/" + call.chatId + "/status").set("rejected");
+        await db.ref("user_calls/" + state.user.uid + "/" + call.chatId).remove();
+    } catch (e) {}
     if (!silent) toast("Звонок отклонён");
 }
 
@@ -559,7 +611,7 @@ async function rejectIncomingCall(silent = false) {
    END CALL
    ===================================================== */
 
-function endCall(silent = false) {
+function endCall(silent) {
     if (!activeCall) return;
     const call = activeCall;
     activeCall = null;
@@ -568,13 +620,13 @@ function endCall(silent = false) {
     clearInterval(call.timerInterval);
     stopRingtone();
 
-    call.cleanup.forEach((fn) => { try { fn(); } catch {} });
-    try { call.pc.close(); } catch {}
-    call.stream.getTracks().forEach((t) => { try { t.stop(); } catch {} });
+    call.cleanup.forEach(function (fn) { try { fn(); } catch (e) {} });
+    try { call.pc.close(); } catch (e) {}
+    call.stream.getTracks().forEach(function (t) { try { t.stop(); } catch (e) {} });
 
-    db.ref(`calls/${call.chatId}`).remove().catch(() => {});
-    db.ref(`user_calls/${call.partnerId}/${call.chatId}`).remove().catch(() => {});
-    db.ref(`user_calls/${state.user.uid}/${call.chatId}`).remove().catch(() => {});
+    db.ref("calls/" + call.chatId).remove().catch(function () {});
+    db.ref("user_calls/" + call.partnerId + "/" + call.chatId).remove().catch(function () {});
+    db.ref("user_calls/" + state.user.uid + "/" + call.chatId).remove().catch(function () {});
 
     resetCallScreenUI();
 }
@@ -587,12 +639,12 @@ function startCallTimer() {
     if (!activeCall) return;
     clearInterval(activeCall.timerInterval);
     const ui = callUI();
-    const update = () => {
+    const update = function () {
         if (!activeCall) return;
         const sec = Math.floor((Date.now() - activeCall.startedAt) / 1000);
         const m = Math.floor(sec / 60);
         const s = sec % 60;
-        ui.status.textContent = `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+        ui.status.textContent = String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
     };
     update();
     activeCall.timerInterval = setInterval(update, 1000);
@@ -609,42 +661,50 @@ function bindCallUI() {
         return;
     }
 
-    ui.endBtn.addEventListener("click", () => {
+    ui.endBtn.addEventListener("click", function () {
         if (activeCall) {
-            db.ref(`calls/${activeCall.chatId}/status`).set("ended").catch(() => {});
+            db.ref("calls/" + activeCall.chatId + "/status").set("ended").catch(function () {});
         }
         endCall(false);
     });
 
-    ui.muteBtn.addEventListener("click", () => {
+    ui.muteBtn.addEventListener("click", function () {
         if (!activeCall) return;
         activeCall.muted = !activeCall.muted;
-        activeCall.stream.getAudioTracks().forEach((t) => { t.enabled = !activeCall.muted; });
+        activeCall.stream.getAudioTracks().forEach(function (t) { t.enabled = !activeCall.muted; });
         ui.muteBtn.classList.toggle("active", activeCall.muted);
     });
 
-    ui.videoBtn.addEventListener("click", () => {
+    ui.videoBtn.addEventListener("click", function () {
         if (!activeCall) return;
         const videoTracks = activeCall.stream.getVideoTracks();
         if (!videoTracks.length) return;
         const enabled = videoTracks[0].enabled;
-        videoTracks.forEach((t) => { t.enabled = !enabled; });
+        videoTracks.forEach(function (t) { t.enabled = !enabled; });
         activeCall.videoOff = enabled;
         ui.videoBtn.classList.toggle("active", enabled);
         ui.localVideo.classList.toggle("video-off", enabled);
     });
 
-    ui.acceptBtn.addEventListener("click", () => acceptIncomingCall());
-    ui.rejectBtn.addEventListener("click", () => rejectIncomingCall());
+    // Кнопка переворота камеры
+    if (ui.flipBtn) {
+        ui.flipBtn.addEventListener("click", function (e) {
+            e.stopPropagation();
+            switchCamera();
+        });
+    }
+
+    ui.acceptBtn.addEventListener("click", function () { acceptIncomingCall(); });
+    ui.rejectBtn.addEventListener("click", function () { rejectIncomingCall(); });
 
     const callBtn = $("chatCallBtn");
     const videoBtn = $("chatVideoBtn");
-    if (callBtn) callBtn.addEventListener("click", () => {
-        if (state.activeChat?.type !== "private") return toast("Звонки доступны только в личных чатах");
+    if (callBtn) callBtn.addEventListener("click", function () {
+        if (state.activeChat && state.activeChat.type !== "private") return toast("Только в личных чатах");
         startCall("audio");
     });
-    if (videoBtn) videoBtn.addEventListener("click", () => {
-        if (state.activeChat?.type !== "private") return toast("Звонки доступны только в личных чатах");
+    if (videoBtn) videoBtn.addEventListener("click", function () {
+        if (state.activeChat && state.activeChat.type !== "private") return toast("Только в личных чатах");
         startCall("video");
     });
 
@@ -652,14 +712,14 @@ function bindCallUI() {
 }
 
 /* =====================================================
-   AUTO-CLEANUP при закрытии страницы
+   AUTO-CLEANUP
    ===================================================== */
 
-window.addEventListener("beforeunload", () => {
+window.addEventListener("beforeunload", function () {
     if (activeCall) {
-        db.ref(`calls/${activeCall.chatId}/status`).set("ended").catch(() => {});
+        db.ref("calls/" + activeCall.chatId + "/status").set("ended").catch(function () {});
     }
     if (incomingCallData) {
-        db.ref(`calls/${incomingCallData.chatId}/status`).set("rejected").catch(() => {});
+        db.ref("calls/" + incomingCallData.chatId + "/status").set("rejected").catch(function () {});
     }
 });
