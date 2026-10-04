@@ -18,22 +18,20 @@ let recorder = null;
 
 function autosizeInput() {
     const input = $("messageInput");
+    if (!input) return;
     input.style.height = "auto";
     input.style.height = Math.min(input.scrollHeight, 240) + "px";
 }
 
 function updateSendMode() {
     const btn = $("sendBtn");
-    const hasText = $("messageInput").value.trim().length > 0;
+    const input = $("messageInput");
+    if (!btn || !input) return;
+    const hasText = input.value.trim().length > 0;
     let mode = state.settings.recordMode === "video" ? "video" : "voice";
     if (state.editing) mode = "edit";
     else if (hasText) mode = "send";
     btn.dataset.mode = mode;
-    btn.setAttribute("aria-label", {
-        send: "Отправить", edit: "Сохранить изменения",
-        voice: "Записать голосовое (нажмите, чтобы переключить на видео)",
-        video: "Записать видеосообщение (нажмите, чтобы переключить на голос)",
-    }[mode]);
 }
 
 function setReply(m) {
@@ -101,6 +99,43 @@ async function submitText() {
     }
 
     if (!text) return;
+
+    // Платные сообщения
+    const entry = state.activeChat;
+    if (entry && entry.type === "private" && entry.partnerId) {
+        try {
+            const partnerSnap = await db.ref("users/" + entry.partnerId).once("value");
+            const partner = partnerSnap.val() || {};
+            const price = Number(partner.paidMessagePrice) || 0;
+            if (partner.requirePaymentForStrangers && price > 0) {
+                const contactSnap = await db.ref("user_contacts/" + entry.partnerId + "/" + state.user.uid).once("value");
+                const inContacts = contactSnap.exists();
+                if (!inContacts) {
+                    if ((state.stars || 0) < price) return toast("Нужно ⭐ " + price + ". Недостаточно звёзд.");
+                    const ok = await confirmDialog({
+                        title: "Платное сообщение",
+                        text: "Пользователь берёт ⭐ " + price + " за сообщения от незнакомцев. Отправить?",
+                        ok: "Отправить за ⭐ " + price,
+                    });
+                    if (!ok) return;
+                    const myRef = db.ref("users/" + state.user.uid + "/stars");
+                    const res = await myRef.transaction(function (cur) {
+                        const v = Number(cur) || 0;
+                        if (v < price) return;
+                        return v - price;
+                    });
+                    if (!res.committed) return toast("Недостаточно звёзд");
+                    await db.ref("users/" + entry.partnerId + "/stars").transaction(function (c) {
+                        return (Number(c) || 0) + price;
+                    });
+                    toast("Списано ⭐ " + price);
+                }
+            }
+        } catch (e) {
+            console.warn("[paid-msg]", e.message);
+        }
+    }
+
     const replyTo = state.replyTo;
     input.value = "";
     state.drafts[chatId] = "";
@@ -153,9 +188,8 @@ async function sendImages(files) {
     const replyTo = state.replyTo || undefined;
     let first = true;
     for (let i = 0; i < files.length; i++) {
-        const file = files[i];
         try {
-            const compressed = await compressImage(file);
+            const compressed = await compressImage(files[i]);
             if (compressed.data.length > 7_000_000) { toast("Изображение слишком большое"); continue; }
             await pushMessage(chatId, { type: "image", data: compressed.data, text: first ? caption : "", replyTo: first ? replyTo : undefined });
             first = false;
@@ -168,55 +202,39 @@ async function sendImages(files) {
     }
 }
 
-async function uploadFileToStorage(file, chatId) {
+async function uploadFileToStorage(file) {
     const attempts = [
-        { name: "0x0.st", fn: upload0x0 },
-        { name: "uguu.se", fn: uploadUguu },
-        { name: "catbox.moe", fn: uploadCatbox },
+        { name: "0x0.st", fn: async function (f) {
+            const fd = new FormData(); fd.append("file", f); fd.append("expires", "72");
+            const r = await fetch("https://0x0.st", { method: "POST", body: fd });
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            const t = (await r.text()).trim();
+            if (t.indexOf("http") !== 0) throw new Error("bad response");
+            return t;
+        }},
+        { name: "uguu.se", fn: async function (f) {
+            const fd = new FormData(); fd.append("files[]", f);
+            const r = await fetch("https://uguu.se/upload?output=text", { method: "POST", body: fd });
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            const t = (await r.text()).trim();
+            if (t.indexOf("http") !== 0) throw new Error("bad response");
+            return t;
+        }},
+        { name: "catbox.moe", fn: async function (f) {
+            const fd = new FormData(); fd.append("reqtype", "fileupload"); fd.append("fileToUpload", f);
+            const r = await fetch("https://catbox.moe/user/api.php", { method: "POST", body: fd });
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            const t = (await r.text()).trim();
+            if (t.indexOf("http") !== 0) throw new Error("bad response");
+            return t;
+        }},
     ];
-    let lastError = null;
+    let lastErr = null;
     for (let i = 0; i < attempts.length; i++) {
-        try {
-            console.log("[upload] пробую " + attempts[i].name);
-            return await attempts[i].fn(file);
-        } catch (e) {
-            console.warn("[upload] " + attempts[i].name + " упал:", e.message);
-            lastError = e;
-        }
+        try { return await attempts[i].fn(file); }
+        catch (e) { lastErr = e; }
     }
     throw new Error("Все хостинги недоступны");
-}
-
-async function upload0x0(file) {
-    const fd = new FormData();
-    fd.append("file", file);
-    fd.append("expires", "72");
-    const res = await fetch("https://0x0.st", { method: "POST", body: fd });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const text = (await res.text()).trim();
-    if (text.indexOf("http") !== 0) throw new Error("bad: " + text.slice(0, 80));
-    return text;
-}
-
-async function uploadUguu(file) {
-    const fd = new FormData();
-    fd.append("files[]", file);
-    const res = await fetch("https://uguu.se/upload?output=text", { method: "POST", body: fd });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const text = (await res.text()).trim();
-    if (text.indexOf("http") !== 0) throw new Error("bad: " + text.slice(0, 80));
-    return text;
-}
-
-async function uploadCatbox(file) {
-    const fd = new FormData();
-    fd.append("reqtype", "fileupload");
-    fd.append("fileToUpload", file);
-    const res = await fetch("https://catbox.moe/user/api.php", { method: "POST", body: fd });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const text = (await res.text()).trim();
-    if (text.indexOf("http") !== 0) throw new Error("bad: " + text.slice(0, 80));
-    return text;
 }
 
 async function sendVideoFile(file) {
@@ -229,16 +247,11 @@ async function sendVideoFile(file) {
     btn.disabled = true;
     toast("Загрузка видео…");
     try {
-        const url = await uploadFileToStorage(file, chatId);
-        await pushMessage(chatId, {
-            type: "videoFile", data: url,
-            fileName: file.name || "video.mp4", fileSize: file.size,
-            text: "", replyTo: state.replyTo || undefined,
-        });
+        const url = await uploadFileToStorage(file);
+        await pushMessage(chatId, { type: "videoFile", data: url, fileName: file.name || "video.mp4", fileSize: file.size, text: "", replyTo: state.replyTo || undefined });
         cancelReplyEdit();
         toast("Видео отправлено");
     } catch (error) {
-        console.error(error);
         toast("Не удалось загрузить: " + error.message);
     } finally {
         btn.disabled = false;
@@ -250,7 +263,7 @@ async function sendFile(file) {
     if (!state.activeChatId) return;
     if (file.type.indexOf("image/") === 0) return sendImages([file]);
     if (file.type.indexOf("video/") === 0) return sendVideoFile(file);
-    if (file.size > 100 * 1048576) return toast("Максимальный размер — 100 МБ");
+    if (file.size > 100 * 1048576) return toast("Макс. 100 МБ");
     try {
         const data = await readAsDataURL(file);
         await pushMessage(state.activeChatId, { type: "file", data: data, fileName: file.name, fileSize: file.size, text: "", replyTo: state.replyTo || undefined });
@@ -270,25 +283,17 @@ function handleFiles(fileList) {
 
 function pickMime(kind) {
     if (kind === "video") {
-        const candidates = [
-            "video/webm;codecs=vp8,opus",
-            "video/webm;codecs=vp8",
-            "video/webm",
-        ];
-        return candidates.find(function (t) {
-            return window.MediaRecorder && MediaRecorder.isTypeSupported(t);
-        }) || "";
+        const c = ["video/webm;codecs=vp8,opus", "video/webm;codecs=vp8", "video/webm"];
+        return c.find(function (t) { return window.MediaRecorder && MediaRecorder.isTypeSupported(t); }) || "";
     }
-    const audioCandidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
-    return audioCandidates.find(function (t) {
-        return window.MediaRecorder && MediaRecorder.isTypeSupported(t);
-    }) || "";
+    const c = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
+    return c.find(function (t) { return window.MediaRecorder && MediaRecorder.isTypeSupported(t); }) || "";
 }
 
 async function startRecording(kind) {
     if (recorder || !state.activeChatId) return;
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
-        return toast("Запись не поддерживается в этом браузере");
+        return toast("Запись не поддерживается");
     }
     const pending = { kind: kind, cancelled: false, starting: true };
     recorder = pending;
@@ -354,41 +359,24 @@ function stopRecording(cancel) {
     rec.mr.onstop = async function () {
         rec.stream.getTracks().forEach(function (t) { t.stop(); });
         if (cancel || duration < 0.8 || !chatId) {
-            if (!cancel && duration < 0.8) toast("Удерживайте кнопку, чтобы записать");
+            if (!cancel && duration < 0.8) toast("Удерживайте кнопку");
             return;
         }
         try {
             const mime = rec.mr.mimeType || (rec.kind === "video" ? "video/webm" : "audio/webm");
             let blob = new Blob(rec.chunks, { type: mime });
-            console.log("[record] mime=" + mime + " size=" + blob.size);
-
-            if (rec.kind === "video" && blob.size > 0) {
-                if (typeof window.ysFixWebmDuration === "function" && mime.indexOf("webm") >= 0) {
-                    try {
-                        blob = await new Promise(function (resolve) {
-                            window.ysFixWebmDuration(blob, duration * 1000, function (fixed) {
-                                resolve(fixed);
-                            });
-                        });
-                        console.log("[record] webm fixed size=" + blob.size);
-                    } catch (e) {
-                        console.warn("[record] fix-webm failed:", e);
-                    }
-                } else {
-                    console.warn("[record] ysFixWebmDuration не загружен");
-                }
+            if (rec.kind === "video" && blob.size > 0 && typeof window.ysFixWebmDuration === "function" && mime.indexOf("webm") >= 0) {
+                try {
+                    blob = await new Promise(function (resolve) {
+                        window.ysFixWebmDuration(blob, duration * 1000, function (fixed) { resolve(fixed); });
+                    });
+                } catch (e) {}
             }
-
             const data = await readAsDataURL(blob);
             if (data.length > 7_000_000) return toast("Запись слишком большая");
-            await pushMessage(chatId, {
-                type: rec.kind, data: data,
-                duration: Math.round(duration), text: "",
-                replyTo: state.replyTo || undefined,
-            });
+            await pushMessage(chatId, { type: rec.kind, data: data, duration: Math.round(duration), text: "", replyTo: state.replyTo || undefined });
             cancelReplyEdit();
         } catch (error) {
-            console.error("[recording]", error);
             toast(friendlyError(error));
         }
     };
@@ -489,6 +477,8 @@ function toggleEmojiPicker(force) {
 
 function bindComposer() {
     const input = $("messageInput");
+    if (!input) { console.error("[composer] #messageInput не найден"); return; }
+
     input.addEventListener("input", function () {
         autosizeInput();
         updateSendMode();
@@ -550,5 +540,6 @@ function bindComposer() {
     });
 
     bindRecordButton();
+    autosizeInput();
     updateSendMode();
 }

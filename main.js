@@ -49,9 +49,7 @@ async function clearHistory(chatId) {
     }
 }
 
-/**
- * Безопасно навешивает listener, если элемент существует.
- */
+/* Утилита: безопасно навешивает listener */
 function on(id, event, handler, opts) {
     const el = document.getElementById(id);
     if (!el) {
@@ -84,6 +82,7 @@ function bindUI() {
             showMenu([
                 { label: "Настройки", icon: "lock", onClick: function () { closeDrawer(); openSettings(); } },
                 { label: "Мой профиль", icon: "user", onClick: function () { closeDrawer(); openProfileEditor(); } },
+                { label: "Контакты", icon: "user", onClick: function () { closeDrawer(); openContactsPanel(); } },
                 { label: "Подарки", icon: "star", onClick: function () { closeDrawer(); openGiftsPanel(); } },
             ], { anchor: drawerMoreBtn });
         });
@@ -197,7 +196,7 @@ function bindUI() {
         if (e.target === document.getElementById("mediaViewer") || e.target === document.getElementById("mediaViewerImg")) closeViewer();
     });
 
-    // ===== SETTINGS / PROFILE PANELS =====
+    // ===== SETTINGS / PROFILE / CONTACTS PANELS =====
     on("settingsBackBtn", "click", function () {
         if (typeof settingsBackHandler === "function" && settingsBackHandler) settingsBackHandler();
         else closeSettings();
@@ -213,21 +212,30 @@ function bindUI() {
         catch (e) { console.error("[localgram] bindCallUI error:", e); }
     }
 
-    // ===== GIFTS & ADMIN =====
+    // ===== GIFTS =====
     if (typeof bindGiftsUI === "function") {
         try { bindGiftsUI(); }
         catch (e) { console.error("[localgram] bindGiftsUI error:", e); }
     }
+
+    // ===== CONTACTS =====
+    if (typeof bindContactsUI === "function") {
+        try { bindContactsUI(); }
+        catch (e) { console.error("[localgram] bindContactsUI error:", e); }
+    }
+
+    // ===== ADMIN =====
     if (typeof bindAdminUI === "function") {
         try { bindAdminUI(); }
         catch (e) { console.error("[localgram] bindAdminUI error:", e); }
     }
 
-    // ===== AUTH STATE — звонки =====
+    // ===== AUTH STATE =====
     auth.onAuthStateChanged(function (user) {
         if (user) {
             setTimeout(function () {
                 if (typeof initCallSystem === "function") initCallSystem();
+                if (typeof listenContacts === "function") listenContacts();
             }, 300);
         } else {
             if (typeof cleanupCallSystem === "function") cleanupCallSystem();
@@ -245,6 +253,7 @@ function bindUI() {
         const emojiPicker = document.getElementById("emojiPicker");
         const adminPanel = document.getElementById("adminPanel");
         const giftsPanel = document.getElementById("giftsPanel");
+        const contactsPanel = document.getElementById("contactsPanel");
         const settingsPanel = document.getElementById("settingsPanel");
         const profilePanel = document.getElementById("profilePanel");
         const searchView = document.getElementById("searchView");
@@ -258,6 +267,7 @@ function bindUI() {
         if (emojiPicker && !emojiPicker.classList.contains("hidden")) return emojiPicker.classList.add("hidden");
         if (adminPanel && adminPanel.classList.contains("open")) return closeAdminPanel();
         if (giftsPanel && giftsPanel.classList.contains("open")) return closeGiftsPanel();
+        if (contactsPanel && contactsPanel.classList.contains("open")) return closeContactsPanel();
         if (settingsPanel && settingsPanel.classList.contains("open")) return closeSettings();
         if (profilePanel && profilePanel.classList.contains("open")) return closeProfilePanel();
         if (searchView && !searchView.classList.contains("hidden")) return closeSearch();

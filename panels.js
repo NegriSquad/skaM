@@ -1,17 +1,4 @@
 /* ===== DRAWER ===== */
-function formatBirthday(iso) {
-    if (!iso) return "Не указана";
-    const parts = String(iso).split("-");
-    if (parts.length !== 3) return iso;
-    const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-    if (isNaN(d.getTime())) return iso;
-    const now = new Date();
-    let age = now.getFullYear() - d.getFullYear();
-    const m = now.getMonth() - d.getMonth();
-    if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
-    const formatted = d.toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
-    return formatted + (age > 0 ? " (" + age + " " + plural(age, "год", "года", "лет") + ")" : "");
-}
 
 function formatBirthday(iso) {
     if (!iso) return "Не указана";
@@ -30,20 +17,19 @@ function formatBirthday(iso) {
 function renderDrawerProfile() {
     const p = state.profile;
     if (!p) return;
-
     setAvatar($("drawerAvatar"), p.nickname || p.username, p.avatarUrl, { key: state.user.uid });
     const nameEl = $("drawerName");
-    nameEl.replaceChildren(h("span", { text: p.nickname || p.username }));
+    nameEl.replaceChildren();
+    const myPref = (typeof prefixBadge === "function") ? prefixBadge(state.user.uid) : null;
+    if (myPref) nameEl.appendChild(myPref);
+    nameEl.appendChild(h("span", { text: p.nickname || p.username }));
     if (isVerifiedUser(p.username)) nameEl.appendChild(verifiedBadge(18));
     $("drawerUsername").textContent = "@" + p.username;
-
     const statusEl = $("drawerStatus");
     if (statusEl) statusEl.textContent = "в сети";
-
     const starsEl = $("drawerStarsCount");
     if (starsEl) starsEl.textContent = (state.stars || 0).toLocaleString("ru-RU");
 
-    // ===== ПРОФИЛЬНАЯ КАРТОЧКА =====
     const profileCard = $("drawerProfileCard");
     if (profileCard) {
         const rows = [];
@@ -54,8 +40,7 @@ function renderDrawerProfile() {
             h("span", { class: "tg-row-icon", style: "background:#4caf50" }, icon("unmute")),
             h("span", { class: "tg-row-text" },
                 h("strong", { text: (state.user && state.user.phoneNumber) || "+ не привязан" }),
-                h("small", { text: "Телефон" })
-            )
+                h("small", { text: "Телефон" }))
         ));
 
         rows.push(h("button", { class: "tg-row", onclick: function () {
@@ -64,8 +49,7 @@ function renderDrawerProfile() {
             h("span", { class: "tg-row-icon", style: "background:#3390ec" }, icon("at")),
             h("span", { class: "tg-row-text" },
                 h("strong", { text: "@" + p.username }),
-                h("small", { text: "Имя пользователя" })
-            )
+                h("small", { text: "Имя пользователя" }))
         ));
 
         const birthdayText = p.birthday ? formatBirthday(p.birthday) : "Не указана";
@@ -76,50 +60,41 @@ function renderDrawerProfile() {
             h("span", { class: "tg-row-icon", style: "background:#a855f7" }, icon("star")),
             h("span", { class: "tg-row-text" },
                 h("strong", { text: birthdayText }),
-                h("small", { text: "Дата рождения" })
-            )
+                h("small", { text: "Дата рождения" }))
         ));
 
         profileCard.replaceChildren.apply(profileCard, rows);
     }
 
-    // ===== МЕНЮШКА =====
     const menuCard = $("drawerMenuCard");
     if (menuCard) {
         const items = [];
         const rowDef = function (drawerId, bgColor, iconName, title) {
-            return h("button", {
-                class: "tg-row",
-                onclick: function () {
-                    if (drawerId === "profile") { closeDrawer(); openProfileEditor(); }
-                    else if (drawerId === "gifts") { closeDrawer(); openGiftsPanel(); }
-                    else if (drawerId === "new-group") { closeDrawer(); openNewGroup(); }
-                    else if (drawerId === "saved") { closeDrawer(); openSaved(); }
-                    else if (drawerId === "archive") { closeDrawer(); setFolder("archive"); }
-                    else if (drawerId === "settings") { closeDrawer(); openSettings(); }
-                    else if (drawerId === "admin") { closeDrawer(); openAdminPanel(); }
-                }
-            },
+            return h("button", { class: "tg-row", onclick: function () {
+                if (drawerId === "profile") { closeDrawer(); openProfileEditor(); }
+                else if (drawerId === "contacts") { closeDrawer(); openContactsPanel(); }
+                else if (drawerId === "gifts") { closeDrawer(); openGiftsPanel(); }
+                else if (drawerId === "new-group") { closeDrawer(); openNewGroup(); }
+                else if (drawerId === "saved") { closeDrawer(); openSaved(); }
+                else if (drawerId === "archive") { closeDrawer(); setFolder("archive"); }
+                else if (drawerId === "settings") { closeDrawer(); openSettings(); }
+                else if (drawerId === "admin") { closeDrawer(); openAdminPanel(); }
+            }},
                 h("span", { class: "tg-row-icon", style: "background:" + bgColor }, icon(iconName)),
                 h("span", { class: "tg-row-text" }, h("strong", { text: title }))
             );
         };
-
         items.push(rowDef("profile", "#3390ec", "user", "Мой профиль"));
+        items.push(rowDef("contacts", "#26c6da", "user", "Контакты"));
         items.push(rowDef("gifts", "#f59e0b", "star", "Подарки"));
         items.push(rowDef("new-group", "#4caf50", "group", "Создать группу"));
         items.push(rowDef("saved", "#f44336", "bookmark", "Избранное"));
         items.push(rowDef("archive", "#607d8b", "archive", "Архив"));
         items.push(rowDef("settings", "#9e9e9e", "lock", "Настройки"));
-
-        if (state.isAdmin) {
-            items.push(rowDef("admin", "#e53935", "lock", "Админ-панель"));
-        }
-
+        if (state.isAdmin) items.push(rowDef("admin", "#e53935", "lock", "Админ-панель"));
         menuCard.replaceChildren.apply(menuCard, items);
     }
 }
-
 
 function openDrawer() {
     $("drawer").classList.add("open");
@@ -151,13 +126,16 @@ function infoRow(iconName, value, label, onClick) {
         icon(iconName), h("span", { class: "info-row-text" }, h("span", { text: value }), h("small", { text: label })));
 }
 
-function namedTitle(name, username, tag) {
-    const el = h(tag || "h3", {}, h("span", { text: name }));
+function namedTitle(name, username, tag, uid) {
+    const el = h(tag || "h3", {});
+    if (uid && typeof prefixBadge === "function") {
+        const pref = prefixBadge(uid);
+        if (pref) el.appendChild(pref);
+    }
+    el.appendChild(h("span", { text: name }));
     if (isVerifiedUser(username)) el.appendChild(verifiedBadge(18));
     return el;
 }
-
-/* ===== INFO TABS ===== */
 
 function infoTabsBar() {
     const tabs = [
@@ -171,10 +149,7 @@ function infoTabsBar() {
                 class: "info-tab" + (infoPanelTab === t.id ? " active" : ""),
                 role: "tab",
                 "aria-selected": infoPanelTab === t.id,
-                onclick: function () {
-                    infoPanelTab = t.id;
-                    renderInfoPanel();
-                }
+                onclick: function () { infoPanelTab = t.id; renderInfoPanel(); }
             }, icon(t.icon), h("span", { text: t.label }));
         })
     );
@@ -184,18 +159,12 @@ function mediaGridContent() {
     const images = state.messages.filter(function (m) { return m.type === "image"; }).reverse();
     if (!images.length) return h("div", { class: "list-empty", text: "Здесь появятся фото из этого чата" });
     return h("div", { class: "media-grid" }, images.map(function (m) {
-        return h("button", {
-            style: "background-image:url('" + m.data + "')",
-            "aria-label": "Открыть фото",
-            onclick: function () { openViewer(m.data, m.text); }
-        });
+        return h("button", { style: "background-image:url('" + m.data + "')", "aria-label": "Открыть фото", onclick: function () { openViewer(m.data, m.text); } });
     }));
 }
 
 function filesGridContent() {
-    const files = state.messages.filter(function (m) {
-        return m.type === "file" || m.type === "videoFile" || m.type === "voice";
-    }).reverse();
+    const files = state.messages.filter(function (m) { return m.type === "file" || m.type === "videoFile" || m.type === "voice"; }).reverse();
     if (!files.length) return h("div", { class: "list-empty", text: "Файлы из этого чата появятся здесь" });
     return h("div", { class: "info-files-list" }, files.map(function (m) {
         const isVideo = m.type === "videoFile";
@@ -203,39 +172,31 @@ function filesGridContent() {
         const kindIcon = isVideo ? "video" : isVoice ? "unmute" : "file";
         const kindLabel = isVideo ? "Видео" : isVoice ? "Голосовое" : (m.fileName || "Файл");
         const extra = m.fileSize ? formatSize(m.fileSize) : (m.duration ? formatDuration(m.duration) : "");
-        return h("button", {
-            class: "info-file-row",
-            onclick: function () {
-                if (isVoice) {
-                    const a = new Audio(m.data);
-                    a.play().catch(function () {});
-                    return;
-                }
-                const link = h("a", { href: m.data, download: m.fileName || "file", target: "_blank" });
-                document.body.appendChild(link);
-                link.click();
-                link.remove();
-            }
-        },
+        return h("button", { class: "info-file-row", onclick: function () {
+            if (isVoice) { const a = new Audio(m.data); a.play().catch(function () {}); return; }
+            const link = h("a", { href: m.data, download: m.fileName || "file", target: "_blank" });
+            document.body.appendChild(link); link.click(); link.remove();
+        }},
             h("span", { class: "info-file-icon" + (isVoice ? " voice" : "") }, icon(kindIcon)),
             h("span", { class: "info-file-info" },
                 h("strong", { text: kindLabel }),
-                h("small", { text: (extra ? extra + " · " : "") + formatListTime(m.timestamp) })
-            )
+                h("small", { text: (extra ? extra + " · " : "") + formatListTime(m.timestamp) }))
         );
     }));
 }
 
 function giftsGridContent() {
-    const gifts = state.messages.filter(function (m) { return m.type === "gift"; }).reverse();
+    const gifts = state.messages.filter(function (m) { return m.type === "gift" || m.type === "nft"; }).reverse();
     if (!gifts.length) return h("div", { class: "list-empty", text: "Подарки из этого чата появятся здесь" });
     return h("div", { class: "info-gifts-grid" }, gifts.map(function (m) {
         const out = m.senderId === state.user.uid;
+        const emoji = m.type === "nft" ? (m.nftEmoji || "🎁") : (m.giftEmoji || "🎁");
+        const name = m.type === "nft" ? (m.nftName || "NFT") : (m.giftName || "Подарок");
+        const price = m.type === "nft" ? (m.nftPrice || 0) : (m.giftPrice || 0);
         return h("div", { class: "info-gift-card " + (out ? "out" : "in") },
-            h("span", { class: "info-gift-emoji", text: m.giftEmoji || "🎁" }),
-            h("span", { class: "info-gift-name", text: m.giftName || "Подарок" }),
-            h("small", { class: "info-gift-price", text: "⭐ " + (m.giftPrice || 0).toLocaleString("ru-RU") })
-        );
+            h("span", { class: "info-gift-emoji", text: emoji }),
+            h("span", { class: "info-gift-name", text: name }),
+            h("small", { class: "info-gift-price", text: "⭐ " + price.toLocaleString("ru-RU") }));
     }));
 }
 
@@ -245,8 +206,6 @@ function infoTabContent() {
     if (infoPanelTab === "gifts") return giftsGridContent();
     return h("div");
 }
-
-/* ===== INFO PANEL RENDER ===== */
 
 async function renderInfoPanel() {
     const entry = state.activeChat;
@@ -259,8 +218,7 @@ async function renderInfoPanel() {
         $("infoHeaderTitle").textContent = "Избранное";
         body.replaceChildren(
             h("div", { class: "info-hero" }, avatarEl("", "", "huge", { icon: "bookmark" }), h("h3", { text: "Избранное" }), h("p", { text: "Только вы видите этот чат" })),
-            h("div", { class: "info-section" }, infoTabsBar(), infoTabContent())
-        );
+            h("div", { class: "info-section" }, infoTabsBar(), infoTabContent()));
         return;
     }
 
@@ -302,8 +260,12 @@ async function renderInfoPanel() {
         });
 
         const userNodes = users.map(function (u) {
-            const displayName = u.uid === state.user.uid ? (u.nickname + " (вы)") : (u.nickname || u.username);
-            const nameEl = h("strong", { text: displayName });
+            const nameEl = h("strong", {});
+            if (typeof prefixBadge === "function") {
+                const pref = prefixBadge(u.uid);
+                if (pref) nameEl.appendChild(pref);
+            }
+            nameEl.appendChild(h("span", { text: u.uid === state.user.uid ? (u.nickname + " (вы)") : (u.nickname || u.username) }));
             if (isVerifiedUser(u.username)) nameEl.appendChild(verifiedBadge(14));
             return h("button", { class: "member-row", onclick: function () { openUserProfile(u.uid); } },
                 avatarEl(u.nickname || u.username, u.avatarUrl, "small", { key: u.uid }),
@@ -315,53 +277,52 @@ async function renderInfoPanel() {
         return;
     }
 
-    /* ===== ЛИЧНЫЙ ЧАТ ===== */
-
     $("infoHeaderTitle").textContent = "Информация";
     const p = partnerProfile || {
-        nickname: entry.partnerName,
-        username: entry.partnerUsername,
-        avatarUrl: entry.partnerAvatarUrl,
-        bio: entry.partnerBio,
+        nickname: entry.partnerName, username: entry.partnerUsername,
+        avatarUrl: entry.partnerAvatarUrl, bio: entry.partnerBio,
     };
 
-    // Загружаем мифические NFT собеседника
     let partnerMythics = [];
     if (entry.partnerId && typeof loadMythicNFTs === "function") {
         partnerMythics = await loadMythicNFTs(entry.partnerId).catch(function () { return []; });
     }
 
-    // Строим аватар и оборачиваем в контейнер для орбиты
     const avatarNode = avatarEl(p.nickname || p.username, p.avatarUrl, "huge", { key: entry.partnerId });
     const avatarBox = h("div", { class: "profile-avatar-block profile-avatar-block-info" }, avatarNode);
 
     if (partnerMythics.length && typeof buildMythicOrbit === "function") {
-        const orbit = buildMythicOrbit(partnerMythics, avatarNode);
-        avatarBox.appendChild(orbit);
+        avatarBox.appendChild(buildMythicOrbit(partnerMythics, avatarNode));
     }
     if (p.avatarUrl) {
         avatarNode.style.cursor = "zoom-in";
         avatarNode.addEventListener("click", function () { openViewer(p.avatarUrl, p.nickname); });
     }
 
+    const inContacts = (typeof isContact === "function") && isContact(entry.partnerId);
+
     body.replaceChildren(
         h("div", { class: "info-hero" },
             avatarBox,
-            namedTitle(p.nickname || p.username, p.username),
-            h("p", { class: p.online ? "online" : "", text: p.online ? "в сети" : formatLastSeen(p.lastSeen) })
-        ),
+            namedTitle(p.nickname || p.username, p.username, "h3", entry.partnerId),
+            h("p", { class: p.online ? "online" : "", text: p.online ? "в сети" : formatLastSeen(p.lastSeen) })),
         partnerMythics.length ? h("p", { class: "field-hint", style: "text-align:center;padding: 0 0 8px", text: "🎖 Мифических NFT: " + partnerMythics.length }) : null,
         h("div", { class: "info-actions" },
             h("button", { onclick: function () { toggleInfoPanel(false); $("messageInput").focus(); } }, icon("message"), "Написать"),
+            h("button", { onclick: async function () {
+                if (typeof toggleContact !== "function") return;
+                const user = await getUser(entry.partnerId).catch(function () { return null; });
+                if (!user) return;
+                await toggleContact(user);
+                renderInfoPanel();
+            }}, icon("user"), inContacts ? "Убрать" : "В контакты"),
             h("button", { onclick: function () { ref.update({ muted: entry.muted ? null : true }); } }, icon(entry.muted ? "unmute" : "mute"), entry.muted ? "Включить" : "Без звука"),
-            h("button", { onclick: function () { toggleInfoPanel(false); openChatSearch(); } }, icon("search"), "Поиск"),
             h("button", { onclick: function () { deleteChat(chatId); } }, icon("trash"), "Удалить")),
         h("div", { class: "info-section" },
             p.bio ? infoRow("info", p.bio, "О себе") : null,
             infoRow("at", "@" + p.username, "Имя пользователя", function () { navigator.clipboard.writeText("@" + p.username).then(function () { toast("Username скопирован"); }); }),
             muteRow),
-        h("div", { class: "info-section" }, infoTabsBar(), infoTabContent())
-    );
+        h("div", { class: "info-section" }, infoTabsBar(), infoTabContent()));
 }
 
 /* ===== USER PROFILE ===== */
@@ -371,31 +332,30 @@ async function openUserProfile(uid) {
     const user = await getUser(uid);
     if (!user) return toast("Пользователь не найден");
 
-    // Загружаем мифические NFT
-    const mythics = await loadMythicNFTs(uid);
+    const mythics = (typeof loadMythicNFTs === "function") ? await loadMythicNFTs(uid).catch(function () { return []; }) : [];
 
-    // Аватар
     const avatarBox = h("div", { class: "profile-avatar-block profile-avatar-block-modal" },
-        avatarEl(user.nickname || user.username, user.avatarUrl, "huge", { key: uid })
-    );
-
-    if (mythics.length) {
-        const orbit = buildMythicOrbit(mythics, avatarBox);
-        avatarBox.appendChild(orbit);
+        avatarEl(user.nickname || user.username, user.avatarUrl, "huge", { key: uid }));
+    if (mythics.length && typeof buildMythicOrbit === "function") {
+        avatarBox.appendChild(buildMythicOrbit(mythics, avatarBox));
     }
+
+    const inContacts = typeof isContact === "function" && isContact(uid);
 
     openModal({
         title: "Профиль",
         body: [
-            h("div", { class: "info-hero" },
-                avatarBox,
-                namedTitle(user.nickname || user.username, user.username),
-                h("p", { class: user.online ? "online" : "", text: user.online ? "в сети" : formatLastSeen(user.lastSeen) })
-            ),
+            h("div", { class: "info-hero" }, avatarBox,
+                namedTitle(user.nickname || user.username, user.username, "h3", uid),
+                h("p", { class: user.online ? "online" : "", text: user.online ? "в сети" : formatLastSeen(user.lastSeen) })),
             user.bio ? infoRow("info", user.bio, "О себе") : null,
             infoRow("at", "@" + user.username, "Имя пользователя"),
             mythics.length ? h("p", { class: "field-hint", style: "text-align:center;padding: 4px 0 8px", text: "🎖 Мифических NFT: " + mythics.length }) : null,
             h("button", { class: "tg-btn primary", onclick: function () { closeModal(); startPrivateChat(user); } }, "Написать сообщение"),
+            h("button", { class: "tg-btn", onclick: async function () {
+                if (typeof toggleContact !== "function") return;
+                await toggleContact(user); closeModal();
+            }}, inContacts ? "✓ Убрать из контактов" : "＋ В контакты"),
             h("button", { class: "tg-btn", onclick: function () {
                 closeModal();
                 openGiftsPanel({ uid: user.uid, nickname: user.nickname, username: user.username, avatarUrl: user.avatarUrl });
@@ -448,7 +408,6 @@ function renderProfilePanel() {
     username.value = p.username || "";
     const bio = h("textarea", { placeholder: " ", maxlength: 140 });
     bio.value = p.bio || "";
-
     const birthdayInput = h("input", { type: "date", class: "tg-field-date", max: new Date().toISOString().slice(0, 10) });
     if (p.birthday) birthdayInput.value = p.birthday;
 
@@ -459,11 +418,7 @@ function renderProfilePanel() {
         const nick = nickname.value.trim();
         const uname = normalizeUsername(username.value);
         if (!nick) return toast("Введите имя");
-        if (!isValidUsername(uname)) {
-            hint.className = "field-hint error";
-            hint.textContent = "Username: латиница, цифры и _, от 3 до 32 символов.";
-            return;
-        }
+        if (!isValidUsername(uname)) { hint.className = "field-hint error"; hint.textContent = "Username: латиница, цифры и _, 3-32."; return; }
         save.disabled = true;
         try {
             if (uname !== p.username) {
@@ -471,23 +426,10 @@ function renderProfilePanel() {
                     if (current === null || current === state.user.uid) return state.user.uid;
                     return;
                 });
-                if (!txResult.committed) {
-                    hint.className = "field-hint error";
-                    hint.textContent = "Этот username уже занят.";
-                    save.disabled = false;
-                    return;
-                }
-                if (p.username && p.username !== uname) {
-                    await db.ref("usernames/" + p.username).remove().catch(function () {});
-                }
+                if (!txResult.committed) { hint.className = "field-hint error"; hint.textContent = "Этот username уже занят."; save.disabled = false; return; }
+                if (p.username && p.username !== uname) await db.ref("usernames/" + p.username).remove().catch(function () {});
             }
-            const updates = {
-                nickname: nick,
-                username: uname,
-                bio: bio.value.trim(),
-                birthday: birthdayInput.value || "",
-                updatedAt: Date.now(),
-            };
+            const updates = { nickname: nick, username: uname, bio: bio.value.trim(), birthday: birthdayInput.value || "", updatedAt: Date.now() };
             if (newAvatar) updates.avatarUrl = newAvatar;
             await db.ref("users/" + state.user.uid).update(updates);
             state.profile = Object.assign({}, p, updates);
@@ -495,8 +437,7 @@ function renderProfilePanel() {
 
             const partnerUpdates = {};
             Object.entries(state.chats).forEach(function (pair) {
-                const chatId = pair[0];
-                const e = pair[1];
+                const chatId = pair[0], e = pair[1];
                 if (e.type === "group" || e.type === "saved" || !e.partnerId) return;
                 const base = "user_chats/" + e.partnerId + "/" + chatId;
                 partnerUpdates[base + "/partnerName"] = nick;
@@ -508,13 +449,9 @@ function renderProfilePanel() {
             renderDrawerProfile();
             closeProfilePanel();
             toast("Профиль сохранён");
-        } catch (error) {
-            toast(friendlyError(error));
-            save.disabled = false;
-        }
+        } catch (error) { toast(friendlyError(error)); save.disabled = false; }
     });
 
-    // Контейнер для аватарки с орбитой мифических NFT
     const avatarBlock = h("div", { class: "profile-avatar-block" }, avatarBtn, fileInput);
 
     $("profileBody").replaceChildren(
@@ -525,22 +462,83 @@ function renderProfilePanel() {
             h("div", {}, h("label", { class: "tg-field" }, username, h("span", { text: "Username" })), hint),
             h("div", { class: "profile-birthday-field" },
                 h("label", { class: "profile-birthday-label", text: "Дата рождения" }),
-                birthdayInput
-            ),
-            h("p", { class: "field-hint", text: "Email: " + (p.email || state.user.email || "—") })
-        ),
-        h("div", { class: "profile-edit-actions" }, save)
-    );
+                birthdayInput),
+            h("p", { class: "field-hint", text: "Email: " + (p.email || state.user.email || "—") })),
+        h("div", { class: "profile-edit-actions" }, save));
 
-    // Асинхронно подгружаем мифические NFT и рисуем вокруг аватарки
-    loadMythicNFTs(state.user.uid).then(function (mythics) {
-        if (!mythics.length) return;
-        // Убеждаемся, что панель всё ещё открыта
-        if (!$("profilePanel").classList.contains("open")) return;
-        const orbit = buildMythicOrbit(mythics, avatarBtn);
-        avatarBlock.appendChild(orbit);
-    });
+    if (typeof loadMythicNFTs === "function") {
+        loadMythicNFTs(state.user.uid).then(function (mythics) {
+            if (!mythics.length) return;
+            if (!$("profilePanel").classList.contains("open")) return;
+            avatarBlock.appendChild(buildMythicOrbit(mythics, avatarBtn));
+        });
+    }
 }
+
+/* ===== MYTHIC NFT ===== */
+
+async function loadMythicNFTs(uid) {
+    try {
+        const snap = await db.ref("nft_items").orderByChild("ownerUid").equalTo(uid).once("value");
+        const items = [];
+        snap.forEach(function (c) {
+            const it = c.val();
+            if (!it) return;
+            if (Number(it.rarityLevel) !== 5) return;
+            items.push(Object.assign({ id: c.key }, it));
+        });
+        items.sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+        return items;
+    } catch (e) { return []; }
+}
+
+function buildMythicOrbit(items, avatarNode) {
+    const orbit = h("div", { class: "mythic-orbit" });
+    const slots = [
+        { x: -95, y: -20, r: -12, z: 1 }, { x: -70, y: -70, r: -20, z: 2 },
+        { x: -20, y: -95, r: -8, z: 3 }, { x: 30, y: -85, r: 10, z: 4 },
+        { x: 85, y: -40, r: 18, z: 5 }, { x: 90, y: 30, r: 15, z: 6 },
+        { x: 20, y: 90, r: 5, z: 7 }, { x: -75, y: 70, r: -10, z: 8 },
+    ];
+    items.slice(0, 8).forEach(function (it, i) {
+        const s = slots[i];
+        const wrap = h("div", {
+            class: "mythic-item",
+            style: "transform: translate(" + s.x + "px," + s.y + "px) rotate(" + s.r + "deg); z-index:" + s.z + ";",
+            title: it.giftName + " · №" + it.serial + "/" + it.supply,
+            onclick: function (e) { e.stopPropagation(); openMythicViewer(it); }
+        });
+        const img = h("img", { class: "mythic-item-img", src: "pic_gift/" + it.giftId + "_5.png", alt: it.giftName, onerror: function () { this.style.display = "none"; wrap.classList.add("no-img"); } });
+        wrap.appendChild(img);
+        const nft = (typeof getNFTById === "function") ? getNFTById(it.giftId) : null;
+        wrap.appendChild(h("span", { class: "mythic-item-emoji", text: (nft && nft.emoji) || "🎁" }));
+        orbit.appendChild(wrap);
+    });
+    return orbit;
+}
+
+function openMythicViewer(item) {
+    const r = (typeof getRarity === "function") ? getRarity(5) : { label: "Мифический", color: "#e53935", id: "mythic" };
+    const imgWrap = h("div", { class: "mythic-viewer-img-wrap" });
+    imgWrap.appendChild(h("img", { class: "mythic-viewer-img", src: "pic_gift/" + item.giftId + "_5.png", alt: item.giftName, onerror: function () { this.style.display = "none"; } }));
+    const nft = (typeof getNFTById === "function") ? getNFTById(item.giftId) : null;
+    imgWrap.appendChild(h("span", { class: "mythic-viewer-emoji", text: (nft && nft.emoji) || "🎁" }));
+    const body = [
+        h("div", { class: "mythic-viewer-hero" },
+            imgWrap,
+            h("div", { class: "mythic-viewer-name", text: item.giftName || "NFT" }),
+            h("div", { class: "mythic-viewer-rarity", style: "color:" + r.color, text: "МИФИЧЕСКИЙ" }),
+            h("div", { class: "mythic-viewer-serial", text: "Серийный №" + (item.serial || "?") + "/" + (item.supply || "?") })),
+        item.fromName ? h("div", { class: "info-row" }, h("span", { class: "info-row-text" }, h("span", { text: item.fromName }), h("small", { text: "От кого" }))) : null,
+        item.message ? h("p", { class: "field-hint", style: "font-style:italic;text-align:center;padding: 8px 16px", text: '"' + item.message + '"' }) : null,
+        h("p", { class: "field-hint", style: "text-align:center;padding: 0 16px 16px", text: "Получен " + new Date(item.createdAt || 0).toLocaleString("ru-RU", { day: "numeric", month: "long", year: "numeric" }) })
+    ].filter(Boolean);
+    openModal({ title: "Мифический NFT", body: body });
+}
+
+/* ===== SETTINGS ===== */
+
+let settingsBackHandler = null;
 
 function openSettings() {
     closeDrawer();
@@ -562,10 +560,8 @@ function settingRow(iconName, title, subtitle, onClick, extra) {
         h("span", { class: "settings-icon" }, icon(iconName)),
         h("span", { class: "settings-text" },
             h("strong", { text: title }),
-            subtitle ? h("small", { text: subtitle }) : null
-        ),
-        extra || null
-    );
+            subtitle ? h("small", { text: subtitle }) : null),
+        extra || null);
 }
 
 function openSettingsSub(title, renderFn) {
@@ -583,16 +579,18 @@ function renderSettingsMain() {
     groups.push(h("div", { class: "settings-group" },
         h("div", { class: "settings-group-title", text: "Аккаунт" }),
         settingRow("user", "Профиль", "Имя, @username, фото", function () { closeSettings(); openProfileEditor(); }),
+        settingRow("user", "Контакты", "Мой список контактов", function () { closeSettings(); openContactsPanel(); }),
         settingRow("star", "Мои звёзды", (state.stars || 0).toLocaleString("ru-RU") + " ⭐", function () { closeSettings(); openGiftsPanel(); }),
         settingRow("lock", "Сменить пароль", "Обновить пароль аккаунта", function () { openSettingsSub("Сменить пароль", renderSettingsChangePassword); }),
         settingRow("at", "Сменить email", (state.user && state.user.email) || "—", function () { openSettingsSub("Сменить email", renderSettingsChangeEmail); }),
         settingRow("bell", "Уведомления и звуки", "Звуки, вибрация", function () { openSettingsSub("Уведомления и звуки", renderSettingsNotifications); }),
         settingRow("lock", "Конфиденциальность", "Последняя активность, пересылка", function () { openSettingsSub("Конфиденциальность", renderSettingsPrivacy); }),
+        settingRow("star", "Платные сообщения", paidMessagesLabel(), function () { openSettingsSub("Платные сообщения", renderSettingsPaidMessages); }),
         settingRow("archive", "Данные и память", "Кэш, автоскачивание", function () { openSettingsSub("Данные и память", renderSettingsData); })
     ));
     groups.push(h("div", { class: "settings-group" },
         h("div", { class: "settings-group-title", text: "Оформление" }),
-        settingRow("edit", "Оформление", "Тема, цвет фона, размер текста", function () { openSettingsSub("Оформление", renderSettingsAppearance); }),
+        settingRow("edit", "Оформление", "Тема, акцент, обои, анимации", function () { openSettingsSub("Оформление", renderSettingsAppearance); }),
         settingRow("at", "Язык", currentLanguageLabel(), function () { openSettingsSub("Язык", renderSettingsLanguage); })
     ));
     groups.push(h("div", { class: "settings-group" },
@@ -604,10 +602,7 @@ function renderSettingsMain() {
     if (state.isAdmin) {
         groups.push(h("div", { class: "settings-group" },
             h("div", { class: "settings-group-title", text: "Администрирование" }),
-            settingRow("lock", "Админ-панель", "Звёзды, подарки, верификация", function () {
-                closeSettings();
-                openAdminPanel();
-            })
+            settingRow("lock", "Админ-панель", "Звёзды, подарки, префиксы, верификация", function () { closeSettings(); openAdminPanel(); })
         ));
     }
     groups.push(h("div", { class: "settings-group" },
@@ -621,163 +616,65 @@ function renderSettingsMain() {
     $("settingsBody").replaceChildren.apply($("settingsBody"), groups);
 }
 
+function paidMessagesLabel() {
+    if (!state.settings.requirePaymentForStrangers) return "Выключено";
+    return "Для незнакомцев: " + (state.settings.paidMessagePrice || 5) + " ⭐";
+}
+
 function currentLanguageLabel() {
     const l = state.settings.language || "ru";
     const map = { ru: "Русский", en: "English", uk: "Українська", de: "Deutsch" };
     return map[l] || "Русский";
 }
 
-/* ===== SETTINGS: CHANGE PASSWORD ===== */
+function renderSettingsPaidMessages() {
+    const s = state.settings;
+    const enabled = h("input", { type: "checkbox", class: "switch" });
+    enabled.checked = !!s.requirePaymentForStrangers;
+    enabled.addEventListener("change", function () {
+        state.settings.requirePaymentForStrangers = enabled.checked;
+        saveSettings();
+        db.ref("users/" + state.user.uid).update({
+            requirePaymentForStrangers: enabled.checked,
+            paidMessagePrice: state.settings.paidMessagePrice || 5,
+        }).catch(function (e) { toast(friendlyError(e)); });
+        renderSettingsPaidMessages();
+    });
 
-function renderSettingsChangePassword() {
-    const currentInput = h("input", { type: "password", placeholder: " ", autocomplete: "current-password" });
-    const newInput = h("input", { type: "password", placeholder: " ", autocomplete: "new-password" });
-    const confirmInput = h("input", { type: "password", placeholder: " ", autocomplete: "new-password" });
-    const hint = h("p", { class: "field-hint", text: "Пароль — минимум 6 символов. Введите текущий пароль." });
-    const save = h("button", { class: "tg-btn primary" }, "Сменить пароль");
-
-    save.addEventListener("click", async function () {
-        const cur = currentInput.value;
-        const nw = newInput.value;
-        const cf = confirmInput.value;
-
-        hint.className = "field-hint";
-        hint.textContent = "";
-
-        if (!cur || !nw || !cf) {
-            hint.className = "field-hint error";
-            hint.textContent = "Заполните все поля.";
-            return;
-        }
-        if (nw.length < 6) {
-            hint.className = "field-hint error";
-            hint.textContent = "Новый пароль — минимум 6 символов.";
-            return;
-        }
-        if (nw !== cf) {
-            hint.className = "field-hint error";
-            hint.textContent = "Новые пароли не совпадают.";
-            return;
-        }
-        if (nw === cur) {
-            hint.className = "field-hint error";
-            hint.textContent = "Новый пароль совпадает с текущим.";
-            return;
-        }
-
-        const user = auth.currentUser;
-        if (!user || !user.email) {
-            hint.className = "field-hint error";
-            hint.textContent = "Не удалось определить пользователя.";
-            return;
-        }
-
-        save.disabled = true;
-        try {
-            const credential = firebase.auth.EmailAuthProvider.credential(user.email, cur);
-            await user.reauthenticateWithCredential(credential);
-            await user.updatePassword(nw);
-            toast("Пароль успешно изменён");
-            currentInput.value = "";
-            newInput.value = "";
-            confirmInput.value = "";
-        } catch (error) {
-            console.error("[password change]", error);
-            hint.className = "field-hint error";
-            hint.textContent = friendlyError(error);
-        } finally {
-            save.disabled = false;
-        }
+    const priceInput = h("input", { type: "number", min: 1, max: 10000, step: 1, class: "tg-field-date", style: "height: 48px;padding: 0 14px" });
+    priceInput.value = s.paidMessagePrice || 5;
+    priceInput.addEventListener("change", function () {
+        state.settings.paidMessagePrice = Math.max(1, Math.floor(Number(priceInput.value) || 1));
+        priceInput.value = state.settings.paidMessagePrice;
+        saveSettings();
+        db.ref("users/" + state.user.uid).update({
+            requirePaymentForStrangers: !!state.settings.requirePaymentForStrangers,
+            paidMessagePrice: state.settings.paidMessagePrice,
+        }).catch(function (e) { toast(friendlyError(e)); });
     });
 
     $("settingsBody").replaceChildren(
         h("div", { class: "settings-group" },
-            h("div", { class: "settings-group-title", text: "Смена пароля" }),
-            h("label", { class: "tg-field" }, currentInput, h("span", { text: "Текущий пароль" })),
-            h("label", { class: "tg-field" }, newInput, h("span", { text: "Новый пароль" })),
-            h("label", { class: "tg-field" }, confirmInput, h("span", { text: "Повторите новый пароль" })),
-            hint
-        ),
-        h("div", { style: "padding: 8px 12px 20px" }, save)
-    );
-}
-
-/* ===== SETTINGS: CHANGE EMAIL ===== */
-
-function renderSettingsChangeEmail() {
-    const currentEmail = (state.user && state.user.email) || (state.profile && state.profile.email) || "—";
-    const passwordInput = h("input", { type: "password", placeholder: " ", autocomplete: "current-password" });
-    const emailInput = h("input", { type: "email", placeholder: " ", autocomplete: "email" });
-    const hint = h("p", { class: "field-hint", text: "Для смены email нужен текущий пароль." });
-    const save = h("button", { class: "tg-btn primary" }, "Сменить email");
-
-    save.addEventListener("click", async function () {
-        const pwd = passwordInput.value;
-        const newEmail = emailInput.value.trim();
-
-        hint.className = "field-hint";
-        hint.textContent = "";
-
-        if (!pwd || !newEmail) {
-            hint.className = "field-hint error";
-            hint.textContent = "Заполните все поля.";
-            return;
-        }
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
-            hint.className = "field-hint error";
-            hint.textContent = "Некорректный email.";
-            return;
-        }
-        if (newEmail === currentEmail) {
-            hint.className = "field-hint error";
-            hint.textContent = "Это уже ваш текущий email.";
-            return;
-        }
-
-        const user = auth.currentUser;
-        if (!user || !user.email) {
-            hint.className = "field-hint error";
-            hint.textContent = "Не удалось определить пользователя.";
-            return;
-        }
-
-        save.disabled = true;
-        try {
-            const credential = firebase.auth.EmailAuthProvider.credential(user.email, pwd);
-            await user.reauthenticateWithCredential(credential);
-            await user.updateEmail(newEmail);
-
-            await db.ref("users/" + state.user.uid + "/email").set(newEmail);
-            if (state.profile) state.profile.email = newEmail;
-
-            toast("Email успешно изменён на " + newEmail);
-            passwordInput.value = "";
-            emailInput.value = "";
-            $("settingsTitle").textContent = "Сменить email";
-        } catch (error) {
-            console.error("[email change]", error);
-            hint.className = "field-hint error";
-            hint.textContent = friendlyError(error);
-        } finally {
-            save.disabled = false;
-        }
-    });
-
-    $("settingsBody").replaceChildren(
+            h("div", { class: "settings-group-title", text: "Оплата от незнакомцев" }),
+            h("label", { class: "settings-row" },
+                h("span", { class: "settings-text" },
+                    h("strong", { text: "Требовать звёзды" }),
+                    h("small", { text: "Сообщения от людей вне ваших контактов будут платными" })),
+                enabled),
+            h("p", { class: "field-hint", style: "padding: 0 14px 8px", text: "Контакты пишут бесплатно." })),
         h("div", { class: "settings-group" },
-            h("div", { class: "settings-group-title", text: "Текущий email" }),
-            h("div", { class: "settings-row" },
-                h("span", { class: "settings-icon" }, icon("at")),
-                h("span", { class: "settings-text" }, h("strong", { text: currentEmail }), h("small", { text: "Подтверждён" }))
-            )
-        ),
+            h("div", { class: "settings-group-title", text: "Стоимость одного сообщения" }),
+            h("div", { style: "padding: 0 14px 12px" }, priceInput),
+            h("p", { class: "field-hint", style: "padding: 0 14px 8px", text: "⭐ Звёзды списываются у отправителя и поступают вам." })),
         h("div", { class: "settings-group" },
-            h("div", { class: "settings-group-title", text: "Новый email" }),
-            h("label", { class: "tg-field" }, emailInput, h("span", { text: "Новый email" })),
-            h("label", { class: "tg-field" }, passwordInput, h("span", { text: "Текущий пароль" })),
-            hint
-        ),
-        h("div", { style: "padding: 8px 12px 20px" }, save)
+            h("button", { class: "settings-row", onclick: function () {
+                db.ref("users/" + state.user.uid).update({
+                    requirePaymentForStrangers: state.settings.requirePaymentForStrangers || false,
+                    paidMessagePrice: state.settings.paidMessagePrice || 5,
+                }).then(function () { toast("Синхронизировано"); }).catch(function (e) { toast(friendlyError(e)); });
+            }},
+                h("span", { class: "settings-icon" }, icon("check")),
+                h("span", { class: "settings-text" }, h("strong", { text: "Синхронизировать" }), h("small", { text: "Если включил до обновления" }))))
     );
 }
 
@@ -788,8 +685,7 @@ function renderSettingsNotifications() {
         input.checked = s[key] !== undefined ? s[key] : def;
         input.addEventListener("change", function () { state.settings[key] = input.checked; saveSettings(); });
         return h("label", { class: "settings-row" },
-            h("span", { class: "settings-text" }, h("strong", { text: label }), sub ? h("small", { text: sub }) : null),
-            input);
+            h("span", { class: "settings-text" }, h("strong", { text: label }), sub ? h("small", { text: sub }) : null), input);
     };
     $("settingsBody").replaceChildren(
         h("div", { class: "settings-group" },
@@ -797,15 +693,12 @@ function renderSettingsNotifications() {
             toggle("notifications", "Показывать уведомления", "Всплывающие уведомления о новых сообщениях", true),
             toggle("sound", "Звук", "Звуковое сопровождение", true),
             toggle("vibrate", "Вибрация", "Вибрировать при новом сообщении", true),
-            toggle("preview", "Предпросмотр", "Показывать текст в уведомлении", true)
-        ),
+            toggle("preview", "Предпросмотр", "Показывать текст в уведомлении", true)),
         h("div", { class: "settings-group" },
             h("div", { class: "settings-group-title", text: "Типы чатов" }),
             toggle("notifyPrivate", "Личные чаты", "Уведомления о личных сообщениях", true),
             toggle("notifyGroups", "Группы", "Уведомления из групп", true),
-            toggle("notifySaved", "Избранное", null, false)
-        )
-    );
+            toggle("notifySaved", "Избранное", null, false)));
 }
 
 function renderSettingsPrivacy() {
@@ -820,16 +713,14 @@ function renderSettingsPrivacy() {
         });
         select.addEventListener("change", function () { state.settings[key] = select.value; saveSettings(); });
         return h("div", { class: "settings-row" },
-            h("span", { class: "settings-text" }, h("strong", { text: label })),
-            select);
+            h("span", { class: "settings-text" }, h("strong", { text: label })), select);
     };
     const toggle = function (key, label, sub, def) {
         const input = h("input", { type: "checkbox", class: "switch" });
         input.checked = s[key] !== undefined ? s[key] : def;
         input.addEventListener("change", function () { state.settings[key] = input.checked; saveSettings(); });
         return h("label", { class: "settings-row" },
-            h("span", { class: "settings-text" }, h("strong", { text: label }), sub ? h("small", { text: sub }) : null),
-            input);
+            h("span", { class: "settings-text" }, h("strong", { text: label }), sub ? h("small", { text: sub }) : null), input);
     };
     const opts = [["everyone", "Все"], ["contacts", "Мои контакты"], ["nobody", "Никто"]];
     $("settingsBody").replaceChildren(
@@ -838,15 +729,12 @@ function renderSettingsPrivacy() {
             dropdown("lastSeen", "Последняя активность", opts, "everyone"),
             dropdown("profilePhoto", "Фото профиля", opts, "everyone"),
             dropdown("bioVisibility", "О себе", opts, "everyone"),
-            dropdown("callsFrom", "Звонки", opts, "everyone")
-        ),
+            dropdown("callsFrom", "Звонки", opts, "everyone")),
         h("div", { class: "settings-group" },
             h("div", { class: "settings-group-title", text: "Сообщения" }),
-            toggle("readReceipts", "Отчёты о прочтении", "Отправлять галочки о прочтении", true),
-            toggle("forwardLink", "Ссылка на профиль при пересылке", "Показывать @username при пересылке", true),
-            toggle("sensitiveContent", "Деликатный контент", "Показывать контент 18+", false)
-        )
-    );
+            toggle("readReceipts", "Отчёты о прочтении", "Отправлять галочки", true),
+            toggle("forwardLink", "Ссылка на профиль при пересылке", "Показывать @username", true),
+            toggle("sensitiveContent", "Деликатный контент", "Контент 18+", false)));
 }
 
 function renderSettingsData() {
@@ -861,8 +749,7 @@ function renderSettingsData() {
         });
         select.addEventListener("change", function () { state.settings[key] = select.value; saveSettings(); });
         return h("div", { class: "settings-row" },
-            h("span", { class: "settings-text" }, h("strong", { text: label })),
-            select);
+            h("span", { class: "settings-text" }, h("strong", { text: label })), select);
     };
     const auto = [["wifi", "Только Wi-Fi"], ["always", "Всегда"], ["never", "Никогда"]];
     $("settingsBody").replaceChildren(
@@ -870,16 +757,13 @@ function renderSettingsData() {
             h("div", { class: "settings-group-title", text: "Использование памяти" }),
             h("button", { class: "settings-row danger", onclick: function () { localStorage.removeItem("localgram_recent_emoji"); toast("Кэш очищен"); } },
                 h("span", { class: "settings-icon" }, icon("trash")),
-                h("span", { class: "settings-text" }, h("strong", { text: "Очистить кэш" })))
-        ),
+                h("span", { class: "settings-text" }, h("strong", { text: "Очистить кэш" })))),
         h("div", { class: "settings-group" },
             h("div", { class: "settings-group-title", text: "Автоскачивание медиа" }),
             dropdown("autoDownloadPhotos", "Фото", auto, "always"),
             dropdown("autoDownloadVideos", "Видео", auto, "wifi"),
             dropdown("autoDownloadFiles", "Файлы", auto, "wifi"),
-            dropdown("autoDownloadVoice", "Голосовые", auto, "always")
-        )
-    );
+            dropdown("autoDownloadVoice", "Голосовые", auto, "always")));
 }
 
 const WALLPAPER_COLORS = [
@@ -890,9 +774,13 @@ const WALLPAPER_COLORS = [
     "#4a2532", "#4a1f3a", "#5a2d3a", "#6b2d4a"
 ];
 
+const ACCENT_COLORS = [
+    "#5288c1", "#3390ec", "#4caf50", "#f59e0b", "#a855f7",
+    "#e53935", "#26c6da", "#ec407a", "#5c6bc0", "#8d6e63",
+];
+
 function renderSettingsAppearance() {
     const s = state.settings;
-
     const themeInput = h("input", { type: "checkbox", class: "switch" });
     themeInput.checked = s.theme === "dark";
     themeInput.addEventListener("change", function () { state.settings.theme = themeInput.checked ? "dark" : "light"; saveSettings(); });
@@ -900,15 +788,11 @@ function renderSettingsAppearance() {
     const size = h("input", { type: "range", min: 13, max: 20, step: 1 });
     size.value = s.fontSize;
     const sizeLabel = h("span", { text: s.fontSize + "px", style: "min-width:40px;text-align:right" });
-    size.addEventListener("input", function () {
-        state.settings.fontSize = Number(size.value);
-        sizeLabel.textContent = size.value + "px";
-        saveSettings();
-    });
+    size.addEventListener("input", function () { state.settings.fontSize = Number(size.value); sizeLabel.textContent = size.value + "px"; saveSettings(); });
 
-    const radius = h("input", { type: "range", min: 6, max: 22, step: 1 });
-    radius.value = s.cornerRadius || 12;
-    const radiusLabel = h("span", { text: (s.cornerRadius || 12) + "px", style: "min-width:40px;text-align:right" });
+    const radius = h("input", { type: "range", min: 0, max: 22, step: 1 });
+    radius.value = s.cornerRadius === undefined ? 12 : s.cornerRadius;
+    const radiusLabel = h("span", { text: radius.value + "px", style: "min-width:40px;text-align:right" });
     radius.addEventListener("input", function () {
         state.settings.cornerRadius = Number(radius.value);
         radiusLabel.textContent = radius.value + "px";
@@ -916,86 +800,92 @@ function renderSettingsAppearance() {
         saveSettings();
     });
 
-    const currentWallpaper = s.chatWallpaper || "";
-    const wallpapers = h("div", { class: "wallpaper-grid" }, WALLPAPER_COLORS.map(function (c) {
-        return h("button", {
-            class: "wallpaper-swatch" + (currentWallpaper === c ? " active" : ""),
-            style: "background: " + c,
-            title: c,
-            "aria-label": "Обои " + c,
-            onclick: function () {
-                state.settings.chatWallpaper = c;
-                applyWallpaperColors(c);
-                saveSettings();
-                renderSettingsAppearance();
-            }
-        });
-    }));
+    const toggleRow = function (key, label, sub, def) {
+        const input = h("input", { type: "checkbox", class: "switch" });
+        input.checked = s[key] !== undefined ? s[key] : def;
+        input.addEventListener("change", function () { state.settings[key] = input.checked; if (typeof applyCustomization === "function") applyCustomization(); saveSettings(); });
+        return h("label", { class: "settings-row" },
+            h("span", { class: "settings-text" }, h("strong", { text: label }), sub ? h("small", { text: sub }) : null), input);
+    };
 
-    const resetBtn = h("button", {
-        class: "settings-row",
-        onclick: function () {
-            state.settings.chatWallpaper = "";
-            applyWallpaperColors("");
+    const accentGrid = h("div", { class: "accent-grid" }, ACCENT_COLORS.map(function (c) {
+        return h("button", { class: "accent-swatch" + (s.accentColor === c ? " active" : ""), style: "background:" + c, title: c, onclick: function () {
+            state.settings.accentColor = c;
+            document.documentElement.style.setProperty("--accent", c);
+            document.documentElement.style.setProperty("--accent-2", c);
             saveSettings();
             renderSettingsAppearance();
-            toast("Обои сброшены");
-        }
-    },
-        h("span", { class: "settings-icon" }, icon("broom")),
-        h("span", { class: "settings-text" }, h("strong", { text: "Сбросить обои" }), h("small", { text: "Вернуть стандартный фон чата" }))
-    );
+        }});
+    }));
+
+    const resetAccent = h("button", { class: "settings-row", onclick: function () {
+        state.settings.accentColor = "";
+        if (typeof applyCustomization === "function") applyCustomization();
+        saveSettings(); renderSettingsAppearance(); toast("Акцент сброшен");
+    }}, h("span", { class: "settings-icon" }, icon("broom")), h("span", { class: "settings-text" }, h("strong", { text: "Сбросить акцент" })));
+
+    const currentWallpaper = s.chatWallpaper || "";
+    const wallpapers = h("div", { class: "wallpaper-grid" }, WALLPAPER_COLORS.map(function (c) {
+        return h("button", { class: "wallpaper-swatch" + (currentWallpaper === c ? " active" : ""), style: "background: " + c, title: c, onclick: function () {
+            state.settings.chatWallpaper = c;
+            applyWallpaperColors(c);
+            saveSettings(); renderSettingsAppearance();
+        }});
+    }));
+
+    const resetWallpaper = h("button", { class: "settings-row", onclick: function () {
+        state.settings.chatWallpaper = "";
+        applyWallpaperColors("");
+        saveSettings(); renderSettingsAppearance(); toast("Обои сброшены");
+    }}, h("span", { class: "settings-icon" }, icon("broom")), h("span", { class: "settings-text" }, h("strong", { text: "Сбросить обои" })));
 
     $("settingsBody").replaceChildren(
         h("div", { class: "settings-group" },
             h("div", { class: "settings-group-title", text: "Тема" }),
             h("label", { class: "settings-row" },
                 h("span", { class: "settings-icon" }, icon("edit")),
-                h("span", { class: "settings-text" }, h("strong", { text: "Ночной режим" }), h("small", { text: "Тёмная тема оформления" })),
-                themeInput)
-        ),
+                h("span", { class: "settings-text" }, h("strong", { text: "Ночной режим" })), themeInput)),
         h("div", { class: "settings-group" },
             h("div", { class: "settings-group-title", text: "Текст" }),
             h("div", { class: "settings-row" },
                 h("span", { class: "settings-icon" }, icon("at")),
-                h("span", { class: "settings-text" }, h("strong", { text: "Размер текста" }), h("small", { text: "Размер шрифта в сообщениях" })),
+                h("span", { class: "settings-text" }, h("strong", { text: "Размер текста" })),
                 h("div", { class: "range-row", style: "flex:0 0 130px" }, size, sizeLabel)),
             h("div", { class: "settings-row" },
                 h("span", { class: "settings-icon" }, icon("message")),
-                h("span", { class: "settings-text" }, h("strong", { text: "Углы сообщений" }), h("small", { text: "Округлость блоков сообщений" })),
-                h("div", { class: "range-row", style: "flex:0 0 130px" }, radius, radiusLabel))
-        ),
+                h("span", { class: "settings-text" }, h("strong", { text: "Углы сообщений" })),
+                h("div", { class: "range-row", style: "flex:0 0 130px" }, radius, radiusLabel))),
+        h("div", { class: "settings-group" },
+            h("div", { class: "settings-group-title", text: "Акцентный цвет" }),
+            accentGrid, resetAccent),
         h("div", { class: "settings-group" },
             h("div", { class: "settings-group-title", text: "Цвет фона чата" }),
-            h("p", { class: "field-hint", style: "padding: 0 12px 8px", text: "Тема полностью подстроится под выбранный цвет." }),
-            wallpapers
-        ),
-        h("div", { class: "settings-group" }, resetBtn)
-    );
+            h("p", { class: "field-hint", style: "padding: 0 12px 8px", text: "Тема подстроится под цвет." }),
+            wallpapers, resetWallpaper),
+        h("div", { class: "settings-group" },
+            h("div", { class: "settings-group-title", text: "Дополнительно" }),
+            toggleRow("hidePattern", "Убрать узор чата", "Чистый фон без паттерна", false),
+            toggleRow("compactMode", "Компактный список чатов", "Больше чатов на экране", false),
+            toggleRow("animationEnabled", "Анимация сообщений", "Плавное появление", true),
+            toggleRow("timeFormat24", "24-часовой формат", "Иначе — 12-часовой", true),
+            toggleRow("reactionsEnabled", "Реакции", "Двойной клик и реакции", true)));
 }
 
 function renderSettingsLanguage() {
     const langs = [["ru", "🇷🇺 Русский"], ["en", "🇬🇧 English"], ["uk", "🇺🇦 Українська"], ["de", "🇩🇪 Deutsch"]];
     const current = state.settings.language || "ru";
     const rows = langs.map(function (pair) {
-        return h("button", {
-            class: "settings-row" + (current === pair[0] ? " active" : ""),
-            onclick: function () {
-                state.settings.language = pair[0];
-                saveSettings();
-                toast("Язык: " + pair[1]);
-                renderSettingsLanguage();
-            }
-        },
+        return h("button", { class: "settings-row" + (current === pair[0] ? " active" : ""), onclick: function () {
+            state.settings.language = pair[0];
+            saveSettings();
+            toast("Язык: " + pair[1]);
+            renderSettingsLanguage();
+        }},
             h("span", { class: "settings-text" }, h("strong", { text: pair[1] })),
             current === pair[0] ? h("span", { class: "settings-icon" }, icon("check")) : null);
     });
-    $("settingsBody").replaceChildren(
-        h("div", { class: "settings-group" },
-            h("div", { class: "settings-group-title", text: "Выберите язык" }),
-            ...rows
-        )
-    );
+    $("settingsBody").replaceChildren(h("div", { class: "settings-group" },
+        h("div", { class: "settings-group-title", text: "Выберите язык" }), ...rows));
 }
 
 function renderSettingsStickers() {
@@ -1004,29 +894,21 @@ function renderSettingsStickers() {
     const suggestions = h("input", { type: "checkbox", class: "switch" });
     suggestions.checked = s.stickerSuggestions !== false;
     suggestions.addEventListener("change", function () { state.settings.stickerSuggestions = suggestions.checked; saveSettings(); });
-
-    const recentNodes = recent.length
-        ? recent.map(function (e) { return h("button", { text: e, style: "font-size:24px" }); })
-        : [h("p", { class: "field-hint", text: "Здесь появятся недавние эмодзи" })];
-
+    const recentNodes = recent.length ? recent.map(function (e) { return h("button", { text: e, style: "font-size:24px" }); }) : [h("p", { class: "field-hint", text: "Здесь появятся недавние эмодзи" })];
     $("settingsBody").replaceChildren(
         h("div", { class: "settings-group" },
             h("div", { class: "settings-group-title", text: "Недавние" }),
-            h("div", { class: "emoji-grid", style: "padding:8px" }, ...recentNodes)
-        ),
+            h("div", { class: "emoji-grid", style: "padding:8px" }, ...recentNodes)),
         h("div", { class: "settings-group" },
             h("div", { class: "settings-group-title", text: "Настройки" }),
             h("label", { class: "settings-row" },
-                h("span", { class: "settings-text" }, h("strong", { text: "Предлагать стикеры" }), h("small", { text: "Показывать стикеры при вводе текста" })),
-                suggestions)
-        )
-    );
+                h("span", { class: "settings-text" }, h("strong", { text: "Предлагать стикеры" }), h("small", { text: "Показывать при вводе" })), suggestions)));
 }
 
 function renderSettingsPremium() {
     const features = [
         ["⭐", "Уникальные стикеры", "Эксклюзивные наборы"],
-        ["📁", "Больше папок", "До 20 папок вместо 10"],
+        ["📁", "Больше папок", "До 20 папок"],
         ["📤", "Загрузка до 4 ГБ", "Большие файлы"],
         ["🎙", "Перевод в текст", "Голосовые в текст"],
         ["🚫", "Без рекламы", "Никаких спонсорских каналов"],
@@ -1042,28 +924,100 @@ function renderSettingsPremium() {
             h("div", { class: "premium-badge" }, "⭐ Localgram Premium"),
             h("p", { text: "Откройте уникальные функции за небольшую подписку" })),
         h("div", { class: "settings-group" },
-            h("div", { class: "settings-group-title", text: "Что вы получите" }),
-            ...featureRows
-        )
-    );
+            h("div", { class: "settings-group-title", text: "Что вы получите" }), ...featureRows));
 }
 
 function renderSettingsAbout() {
     $("settingsBody").replaceChildren(
         h("div", { class: "about-hero" },
-            h("div", { class: "about-logo" },
-                h("svg", { viewBox: "0 0 24 24" }, h("path", { d: "M2.5 11.2 20.3 4.4c.8-.3 1.6.4 1.3 1.3l-3 14.2c-.2.9-1.2 1.2-1.9.7l-4.6-3.4-2.3 2.2c-.3.3-.8.1-.8-.3l.2-3.5 7.7-7c.3-.3 0-.7-.4-.5l-9.6 6-4.1-1.3c-.9-.3-.9-1.5 0-1.8z" }))),
+            h("div", { class: "about-logo" }, h("svg", { viewBox: "0 0 24 24" }, h("path", { d: "M2.5 11.2 20.3 4.4c.8-.3 1.6.4 1.3 1.3l-3 14.2c-.2.9-1.2 1.2-1.9.7l-4.6-3.4-2.3 2.2c-.3.3-.8.1-.8-.3l.2-3.5 7.7-7c.3-.3 0-.7-.4-.5l-9.6 6-4.1-1.3c-.9-.3-.9-1.5 0-1.8z" }))),
             h("h3", { text: "Localgram" }),
-            h("p", { class: "field-hint", text: "Версия Web 2.0" })
-        ),
+            h("p", { class: "field-hint", text: "Версия Web 2.0" })),
         h("div", { class: "settings-group" },
             h("div", { class: "settings-group-title", text: "Информация" }),
             settingRow("user", "Разработчик", "aylppcel", function () { toast("aylppcel"); }),
             settingRow("info", "Версия", "2.0.0", function () { toast("Localgram Web 2.0"); }),
-            settingRow("file", "Лицензия", "MIT", function () { toast("MIT License"); })
-        ),
-        h("p", { class: "field-hint", style: "text-align:center;margin-top:20px", text: "© 2025 Localgram" })
-    );
+            settingRow("file", "Лицензия", "MIT", function () { toast("MIT License"); })),
+        h("p", { class: "field-hint", style: "text-align:center;margin-top:20px", text: "© 2025 Localgram" }));
+}
+
+function renderSettingsChangePassword() {
+    const currentInput = h("input", { type: "password", placeholder: " ", autocomplete: "current-password" });
+    const newInput = h("input", { type: "password", placeholder: " ", autocomplete: "new-password" });
+    const confirmInput = h("input", { type: "password", placeholder: " ", autocomplete: "new-password" });
+    const hint = h("p", { class: "field-hint", text: "Пароль — минимум 6 символов." });
+    const save = h("button", { class: "tg-btn primary" }, "Сменить пароль");
+
+    save.addEventListener("click", async function () {
+        const cur = currentInput.value, nw = newInput.value, cf = confirmInput.value;
+        hint.className = "field-hint"; hint.textContent = "";
+        if (!cur || !nw || !cf) { hint.className = "field-hint error"; hint.textContent = "Заполните все поля."; return; }
+        if (nw.length < 6) { hint.className = "field-hint error"; hint.textContent = "Минимум 6 символов."; return; }
+        if (nw !== cf) { hint.className = "field-hint error"; hint.textContent = "Пароли не совпадают."; return; }
+        if (nw === cur) { hint.className = "field-hint error"; hint.textContent = "Пароль совпадает с текущим."; return; }
+        const user = auth.currentUser;
+        if (!user || !user.email) { hint.className = "field-hint error"; hint.textContent = "Не удалось определить пользователя."; return; }
+        save.disabled = true;
+        try {
+            const credential = firebase.auth.EmailAuthProvider.credential(user.email, cur);
+            await user.reauthenticateWithCredential(credential);
+            await user.updatePassword(nw);
+            toast("Пароль изменён");
+            currentInput.value = ""; newInput.value = ""; confirmInput.value = "";
+        } catch (error) { hint.className = "field-hint error"; hint.textContent = friendlyError(error); }
+        finally { save.disabled = false; }
+    });
+
+    $("settingsBody").replaceChildren(
+        h("div", { class: "settings-group" },
+            h("div", { class: "settings-group-title", text: "Смена пароля" }),
+            h("label", { class: "tg-field" }, currentInput, h("span", { text: "Текущий пароль" })),
+            h("label", { class: "tg-field" }, newInput, h("span", { text: "Новый пароль" })),
+            h("label", { class: "tg-field" }, confirmInput, h("span", { text: "Повторите новый пароль" })),
+            hint),
+        h("div", { style: "padding: 8px 12px 20px" }, save));
+}
+
+function renderSettingsChangeEmail() {
+    const currentEmail = (state.user && state.user.email) || (state.profile && state.profile.email) || "—";
+    const passwordInput = h("input", { type: "password", placeholder: " ", autocomplete: "current-password" });
+    const emailInput = h("input", { type: "email", placeholder: " ", autocomplete: "email" });
+    const hint = h("p", { class: "field-hint", text: "Для смены email нужен текущий пароль." });
+    const save = h("button", { class: "tg-btn primary" }, "Сменить email");
+
+    save.addEventListener("click", async function () {
+        const pwd = passwordInput.value, newEmail = emailInput.value.trim();
+        hint.className = "field-hint"; hint.textContent = "";
+        if (!pwd || !newEmail) { hint.className = "field-hint error"; hint.textContent = "Заполните все поля."; return; }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) { hint.className = "field-hint error"; hint.textContent = "Некорректный email."; return; }
+        if (newEmail === currentEmail) { hint.className = "field-hint error"; hint.textContent = "Это уже ваш текущий email."; return; }
+        const user = auth.currentUser;
+        if (!user || !user.email) { hint.className = "field-hint error"; hint.textContent = "Не удалось определить пользователя."; return; }
+        save.disabled = true;
+        try {
+            const credential = firebase.auth.EmailAuthProvider.credential(user.email, pwd);
+            await user.reauthenticateWithCredential(credential);
+            await user.updateEmail(newEmail);
+            await db.ref("users/" + state.user.uid + "/email").set(newEmail);
+            if (state.profile) state.profile.email = newEmail;
+            toast("Email изменён на " + newEmail);
+            passwordInput.value = ""; emailInput.value = "";
+        } catch (error) { hint.className = "field-hint error"; hint.textContent = friendlyError(error); }
+        finally { save.disabled = false; }
+    });
+
+    $("settingsBody").replaceChildren(
+        h("div", { class: "settings-group" },
+            h("div", { class: "settings-group-title", text: "Текущий email" }),
+            h("div", { class: "settings-row" },
+                h("span", { class: "settings-icon" }, icon("at")),
+                h("span", { class: "settings-text" }, h("strong", { text: currentEmail }), h("small", { text: "Подтверждён" })))),
+        h("div", { class: "settings-group" },
+            h("div", { class: "settings-group-title", text: "Новый email" }),
+            h("label", { class: "tg-field" }, emailInput, h("span", { text: "Новый email" })),
+            h("label", { class: "tg-field" }, passwordInput, h("span", { text: "Текущий пароль" })),
+            hint),
+        h("div", { style: "padding: 8px 12px 20px" }, save));
 }
 
 /* ===== NEW CHAT / GROUP ===== */
@@ -1081,21 +1035,16 @@ function openNewChat() {
     const input = h("input", { type: "text", placeholder: " ", autocomplete: "off" });
     const result = h("div", {});
     const contacts = contactsFromChats();
-    const contactList = h("div", { class: "pick-list" }, contacts.map(function (u) {
-        return userRow(u, function () { startPrivateChat(u); });
-    }));
+    const contactList = h("div", { class: "pick-list" }, contacts.map(function (u) { return userRow(u, function () { startPrivateChat(u); }); }));
     const search = debounce(async function () {
         const q = normalizeUsername(input.value);
         if (q.length < 3) { result.replaceChildren(); return; }
         result.replaceChildren(h("p", { class: "field-hint", text: "Поиск…" }));
         const user = await findUserByUsername(q).catch(function () { return null; });
         if (normalizeUsername(input.value) !== q) return;
-        result.replaceChildren(user
-            ? userRow(user, function () { startPrivateChat(user); })
-            : h("p", { class: "field-hint", text: "Пользователь @" + q + " не найден" }));
+        result.replaceChildren(user ? userRow(user, function () { startPrivateChat(user); }) : h("p", { class: "field-hint", text: "Пользователь @" + q + " не найден" }));
     }, 300);
     input.addEventListener("input", search);
-
     const body = [
         h("label", { class: "tg-field" }, input, h("span", { text: "Username собеседника" })),
         result,
@@ -1132,17 +1081,14 @@ function memberPicker(excludeIds) {
         const rows = contacts.map(function (u) {
             const check = h("input", { type: "checkbox", "aria-label": u.nickname });
             check.checked = selected.has(u.uid);
-            check.addEventListener("change", function () {
-                if (check.checked) selected.set(u.uid, u);
-                else selected.delete(u.uid);
-                renderChips();
-            });
-            const nameEl = h("strong", { text: u.nickname || u.username });
+            check.addEventListener("change", function () { check.checked ? selected.set(u.uid, u) : selected.delete(u.uid); renderChips(); });
+            const nameEl = h("strong", {});
+            if (typeof prefixBadge === "function") { const p = prefixBadge(u.uid); if (p) nameEl.appendChild(p); }
+            nameEl.appendChild(h("span", { text: u.nickname || u.username }));
             if (isVerifiedUser(u.username)) nameEl.appendChild(verifiedBadge(13));
             return h("label", { class: "pick-row" },
                 avatarEl(u.nickname || u.username, u.avatarUrl, "small", { key: u.uid }),
-                h("span", { class: "m-text" }, nameEl, h("small", { text: "@" + u.username })),
-                check);
+                h("span", { class: "m-text" }, nameEl, h("small", { text: "@" + u.username })), check);
         });
         list.replaceChildren.apply(list, rows);
     };
@@ -1152,22 +1098,12 @@ function memberPicker(excludeIds) {
         e.preventDefault();
         const q = normalizeUsername(input.value);
         const user = await findUserByUsername(q).catch(function () { return null; });
-        if (!user) {
-            hint.className = "field-hint error";
-            hint.textContent = "Пользователь @" + q + " не найден";
-            return;
-        }
-        if (user.uid === state.user.uid || excludeIds.indexOf(user.uid) >= 0) {
-            hint.className = "field-hint error";
-            hint.textContent = "Этот пользователь уже в группе";
-            return;
-        }
+        if (!user) { hint.className = "field-hint error"; hint.textContent = "Пользователь @" + q + " не найден"; return; }
+        if (user.uid === state.user.uid || excludeIds.indexOf(user.uid) >= 0) { hint.className = "field-hint error"; hint.textContent = "Уже в группе"; return; }
         selected.set(user.uid, user);
         input.value = "";
-        hint.className = "field-hint";
-        hint.textContent = "Введите username и нажмите Enter";
-        renderChips();
-        renderList();
+        hint.className = "field-hint"; hint.textContent = "Введите username";
+        renderChips(); renderList();
     });
 
     renderList();
@@ -1246,15 +1182,9 @@ function openEditGroup(groupId) {
             await db.ref().update(updates);
             if (name !== entry.title) await pushMessage(groupId, { type: "system", text: state.profile.nickname + " изменил(а) название на «" + name + "»" });
             closeModal();
-        } catch (error) {
-            toast(friendlyError(error));
-            save.disabled = false;
-        }
+        } catch (error) { toast(friendlyError(error)); save.disabled = false; }
     });
-    openModal({
-        title: "Изменить группу",
-        body: [avatarBtn, fileInput, h("label", { class: "tg-field" }, title, h("span", { text: "Название группы" })), save]
-    });
+    openModal({ title: "Изменить группу", body: [avatarBtn, fileInput, h("label", { class: "tg-field" }, title, h("span", { text: "Название группы" })), save] });
 }
 
 function openViewer(src, caption) {
@@ -1269,114 +1199,4 @@ function openViewer(src, caption) {
 function closeViewer() {
     $("mediaViewer").classList.add("hidden");
     $("mediaViewerImg").removeAttribute("src");
-}
-/* ===== MYTHIC NFT AROUND AVATAR ===== */
-
-/**
- * Загружает мифические (rarity 5) NFT пользователя.
- */
-async function loadMythicNFTs(uid) {
-    try {
-        const snap = await db.ref("nft_items").orderByChild("ownerUid").equalTo(uid).once("value");
-        const items = [];
-        snap.forEach(function (c) {
-            const it = c.val();
-            if (!it) return;
-            if (Number(it.rarityLevel) !== 5) return; // только мифические
-            items.push(Object.assign({ id: c.key }, it));
-        });
-        // Сортируем по дате (сначала новые)
-        items.sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
-        return items;
-    } catch (e) {
-        console.warn("[mythic-nft] load failed:", e.message);
-        return [];
-    }
-}
-
-/**
- * Создаёт "облако" мифических NFT вокруг аватарки.
- * Возвращает .mythic-orbit с 8 слотами по кругу.
- */
-function buildMythicOrbit(items, avatarNode) {
-    const orbit = h("div", { class: "mythic-orbit" });
-    // Максимум 8 слотов — больше не влезет красиво
-    const slots = [
-        { x: -95, y: -20, r: -12, z: 1 },   // левый
-        { x: -70, y: -70, r: -20, z: 2 },   // левый верх
-        { x: -20, y: -95, r: -8, z: 3 },    // верх
-        { x: 30,  y: -85, r: 10, z: 4 },    // правый верх
-        { x: 85,  y: -40, r: 18, z: 5 },    // правый
-        { x: 90,  y: 30,  r: 15, z: 6 },    // правый низ
-        { x: 20,  y: 90,  r: 5, z: 7 },     // низ
-        { x: -75, y: 70,  r: -10, z: 8 },   // левый низ
-    ];
-
-    items.slice(0, 8).forEach(function (it, i) {
-        const s = slots[i];
-        const wrap = h("div", {
-            class: "mythic-item",
-            style: "transform: translate(" + s.x + "px," + s.y + "px) rotate(" + s.r + "deg); z-index:" + s.z + ";",
-            title: it.giftName + " · №" + it.serial + "/" + it.supply,
-            onclick: function (e) {
-                e.stopPropagation();
-                openMythicViewer(it);
-            }
-        });
-
-        const img = h("img", {
-            class: "mythic-item-img",
-            src: "pic_gift/" + it.giftId + "_5.png",
-            alt: it.giftName,
-            onerror: function () {
-                this.style.display = "none";
-                wrap.classList.add("no-img");
-            }
-        });
-        wrap.appendChild(img);
-
-        // Фолбэк-эмодзи
-        const nft = (typeof getNFTById === "function") ? getNFTById(it.giftId) : null;
-        const emoji = h("span", { class: "mythic-item-emoji", text: (nft && nft.emoji) || "🎁" });
-        wrap.appendChild(emoji);
-
-        orbit.appendChild(wrap);
-    });
-
-    return orbit;
-}
-
-/**
- * Модалка с подробностями мифического NFT.
- */
-function openMythicViewer(item) {
-    const r = (typeof getRarity === "function") ? getRarity(5) : { label: "Мифический", color: "#e53935", id: "mythic" };
-    const wrap = h("div", { class: "mythic-viewer rarity-" + r.id });
-
-    const imgWrap = h("div", { class: "mythic-viewer-img-wrap" });
-    const img = h("img", {
-        class: "mythic-viewer-img",
-        src: "pic_gift/" + item.giftId + "_5.png",
-        alt: item.giftName,
-        onerror: function () { this.style.display = "none"; }
-    });
-    const nft = (typeof getNFTById === "function") ? getNFTById(item.giftId) : null;
-    const emoji = h("span", { class: "mythic-viewer-emoji", text: (nft && nft.emoji) || "🎁" });
-    imgWrap.append(img, emoji);
-
-    const body = [
-        h("div", { class: "mythic-viewer-hero" },
-            imgWrap,
-            h("div", { class: "mythic-viewer-name", text: item.giftName || "NFT" }),
-            h("div", { class: "mythic-viewer-rarity", style: "color:" + r.color, text: "МИФИЧЕСКИЙ" }),
-            h("div", { class: "mythic-viewer-serial", text: "Серийный №" + (item.serial || "?") + "/" + (item.supply || "?") })
-        ),
-        item.fromName ? h("div", { class: "info-row" },
-            h("span", { class: "info-row-text" }, h("span", { text: item.fromName }), h("small", { text: "От кого" }))
-        ) : null,
-        item.message ? h("p", { class: "field-hint", style: "font-style:italic;text-align:center;padding: 8px 16px", text: '"' + item.message + '"' }) : null,
-        h("p", { class: "field-hint", style: "text-align:center;padding: 0 16px 16px", text: "Получен " + new Date(item.createdAt || 0).toLocaleString("ru-RU", { day: "numeric", month: "long", year: "numeric" }) })
-    ].filter(Boolean);
-
-    openModal({ title: "Мифический NFT", body: body });
 }

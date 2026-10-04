@@ -41,12 +41,26 @@ function startRingtone(fileName) {
         ringtoneAudio = new Audio(fileName || RINGTONE_FILE);
         ringtoneAudio.loop = true;
         ringtoneAudio.volume = RINGTONE_VOLUME;
+
+        // Попытка 1: сразу
         ringtoneAudio.play().catch(function (err) {
-            console.warn("[CALLS] ringtone fallback:", err.message);
-            fallbackBeep();
+            console.warn("[CALLS] ringtone autoplay blocked:", err.message);
+            // Пробуем после первого клика пользователя
+            const resume = function () {
+                document.removeEventListener("click", resume);
+                document.removeEventListener("touchstart", resume);
+                if (ringtoneAudio && ringtoneAudio.paused) {
+                    ringtoneAudio.play().catch(function () {});
+                }
+            };
+            document.addEventListener("click", resume, { once: true });
+            document.addEventListener("touchstart", resume, { once: true });
+            // НЕ вызываем fallbackBeep — пользователь услышит свой рингтон
+            // после первого клика по странице.
         });
     } catch (e) {
-        console.warn("[CALLS] ringtone error:", e);
+        console.warn("[CALLS] ringtone create failed:", e);
+        // Только если Audio вообще не создался — используем beep
         fallbackBeep();
     }
 }
@@ -58,10 +72,10 @@ function startRingback(fileName) {
         ringbackAudio.loop = true;
         ringbackAudio.volume = RINGBACK_VOLUME;
         ringbackAudio.play().catch(function (err) {
-            console.warn("[CALLS] ringback error:", err.message);
+            console.warn("[CALLS] ringback autoplay blocked:", err.message);
         });
     } catch (e) {
-        console.warn("[CALLS] ringback error:", e);
+        console.warn("[CALLS] ringback create failed:", e);
     }
 }
 
@@ -197,17 +211,17 @@ function resetCallScreenUI() {
     if (ui.remoteVideo) ui.remoteVideo.srcObject = null;
     if (ui.localVideo) ui.localVideo.srcObject = null;
     if (ui.remoteAudio) ui.remoteAudio.srcObject = null;
-    ui.remoteVideo.classList.add("hidden");
-    ui.localVideo.classList.add("hidden");
-    ui.infoBlock.classList.remove("hidden");
-    ui.muteBtn.classList.remove("active");
-    ui.videoBtn.classList.remove("active");
+    if (ui.remoteVideo) ui.remoteVideo.classList.add("hidden");
+    if (ui.localVideo) ui.localVideo.classList.add("hidden");
+    if (ui.infoBlock) ui.infoBlock.classList.remove("hidden");
+    if (ui.muteBtn) ui.muteBtn.classList.remove("active");
+    if (ui.videoBtn) ui.videoBtn.classList.remove("active");
     if (ui.flipBtn) ui.flipBtn.classList.remove("loading");
     document.body.classList.remove("in-call");
 }
 
 /* =====================================================
-   SWITCH CAMERA (front / back)
+   SWITCH CAMERA
    ===================================================== */
 
 async function switchCamera() {
@@ -244,7 +258,7 @@ async function switchCamera() {
             });
 
             const newTrack = newStream.getVideoTracks()[0];
-            if (!newTrack) throw new Error("no video track in new stream");
+            if (!newTrack) throw new Error("no video track");
 
             const sender = activeCall.pc.getSenders().find(function (s) {
                 return s.track && s.track.kind === "video";
@@ -331,12 +345,14 @@ async function startCall(type) {
     pc.ontrack = function (e) {
         const remoteStream = e.streams[0];
         const ui = callUI();
-        if (type === "video") {
+        if (type === "video" && ui.remoteVideo) {
             ui.remoteVideo.srcObject = remoteStream;
             ui.remoteVideo.play().catch(function () {});
         }
-        ui.remoteAudio.srcObject = remoteStream;
-        ui.remoteAudio.play().catch(function () {});
+        if (ui.remoteAudio) {
+            ui.remoteAudio.srcObject = remoteStream;
+            ui.remoteAudio.play().catch(function () {});
+        }
     };
 
     pc.onconnectionstatechange = function () {
@@ -431,6 +447,10 @@ function showActiveCallUI() {
     const ui = callUI();
     const call = activeCall;
     if (!call) return;
+    if (!ui.screen) {
+        console.error("[CALLS] callScreen не найден в DOM");
+        return;
+    }
 
     ui.screen.classList.remove("hidden");
     ui.screen.classList.add(call.type === "video" ? "video-mode" : "audio-mode");
@@ -539,12 +559,14 @@ async function acceptIncomingCall() {
     pc.ontrack = function (e) {
         const remoteStream = e.streams[0];
         const ui = callUI();
-        if (type === "video") {
+        if (type === "video" && ui.remoteVideo) {
             ui.remoteVideo.srcObject = remoteStream;
             ui.remoteVideo.play().catch(function () {});
         }
-        ui.remoteAudio.srcObject = remoteStream;
-        ui.remoteAudio.play().catch(function () {});
+        if (ui.remoteAudio) {
+            ui.remoteAudio.srcObject = remoteStream;
+            ui.remoteAudio.play().catch(function () {});
+        }
     };
 
     pc.onconnectionstatechange = function () {
@@ -661,21 +683,21 @@ function bindCallUI() {
         return;
     }
 
-    ui.endBtn.addEventListener("click", function () {
+    if (ui.endBtn) ui.endBtn.addEventListener("click", function () {
         if (activeCall) {
             db.ref("calls/" + activeCall.chatId + "/status").set("ended").catch(function () {});
         }
         endCall(false);
     });
 
-    ui.muteBtn.addEventListener("click", function () {
+    if (ui.muteBtn) ui.muteBtn.addEventListener("click", function () {
         if (!activeCall) return;
         activeCall.muted = !activeCall.muted;
         activeCall.stream.getAudioTracks().forEach(function (t) { t.enabled = !activeCall.muted; });
         ui.muteBtn.classList.toggle("active", activeCall.muted);
     });
 
-    ui.videoBtn.addEventListener("click", function () {
+    if (ui.videoBtn) ui.videoBtn.addEventListener("click", function () {
         if (!activeCall) return;
         const videoTracks = activeCall.stream.getVideoTracks();
         if (!videoTracks.length) return;
@@ -683,19 +705,16 @@ function bindCallUI() {
         videoTracks.forEach(function (t) { t.enabled = !enabled; });
         activeCall.videoOff = enabled;
         ui.videoBtn.classList.toggle("active", enabled);
-        ui.localVideo.classList.toggle("video-off", enabled);
+        if (ui.localVideo) ui.localVideo.classList.toggle("video-off", enabled);
     });
 
-    // Кнопка переворота камеры
-    if (ui.flipBtn) {
-        ui.flipBtn.addEventListener("click", function (e) {
-            e.stopPropagation();
-            switchCamera();
-        });
-    }
+    if (ui.flipBtn) ui.flipBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        switchCamera();
+    });
 
-    ui.acceptBtn.addEventListener("click", function () { acceptIncomingCall(); });
-    ui.rejectBtn.addEventListener("click", function () { rejectIncomingCall(); });
+    if (ui.acceptBtn) ui.acceptBtn.addEventListener("click", function () { acceptIncomingCall(); });
+    if (ui.rejectBtn) ui.rejectBtn.addEventListener("click", function () { rejectIncomingCall(); });
 
     const callBtn = $("chatCallBtn");
     const videoBtn = $("chatVideoBtn");

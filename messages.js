@@ -104,7 +104,12 @@ function renderChatHeader() {
     if (!entry) return;
     const title = entry.type === "private" && partnerProfile ? (partnerProfile.nickname || partnerProfile.username) : chatTitle(entry);
     const titleEl = $("chatTitle");
-    titleEl.replaceChildren(h("span", { text: title }));
+    titleEl.replaceChildren();
+    if (entry.type === "private" && entry.partnerId && typeof prefixBadge === "function") {
+        const pref = prefixBadge(entry.partnerId);
+        if (pref) titleEl.appendChild(pref);
+    }
+    titleEl.appendChild(h("span", { text: title }));
     if (entry.type === "private") {
         const vUsername = (partnerProfile && partnerProfile.username) || entry.partnerUsername;
         if (isVerifiedUser(vUsername)) titleEl.appendChild(verifiedBadge(15));
@@ -250,7 +255,7 @@ function renderMessages(opts) {
     const inner = h("div", { class: "messages-inner" });
     if (state.hasMore) inner.appendChild(h("button", { class: "tg-btn link small load-more", onclick: loadMoreMessages }, "Загрузить ранее"));
     if (!state.messages.length) {
-        inner.appendChild(h("div", { class: "sys-msg" }, h("span", { text: entry && entry.type === "saved" ? "Сохраняйте сюда сообщения, заметки и файлы" : "Сообщений пока нет. Напишите первым!" })));
+        inner.appendChild(h("div", { class: "sys-msg" }, h("span", { text: entry && entry.type === "saved" ? "Сохраняйте сюда сообщения и файлы" : "Сообщений пока нет. Напишите первым!" })));
     }
     const nextCache = new Map();
     let lastDay = null;
@@ -305,7 +310,14 @@ function buildMessage(m, isGroup) {
         slot.appendChild(av);
         row.appendChild(slot);
         if (!author) getUser(m.senderId).then(function (u) { if (u && u.avatarUrl) setAvatar(av, u.nickname, u.avatarUrl); });
-        bubble.appendChild(h("div", { class: "msg-sender", style: "color:" + nameColor(m.senderId), text: m.senderName || "Участник", onclick: function () { openUserProfile(m.senderId); } }));
+
+        const senderEl = h("div", { class: "msg-sender", onclick: function () { openUserProfile(m.senderId); } });
+        if (typeof prefixBadge === "function") {
+            const pref = prefixBadge(m.senderId);
+            if (pref) senderEl.appendChild(pref);
+        }
+        senderEl.appendChild(h("span", { style: "color:" + nameColor(m.senderId), text: m.senderName || "Участник" }));
+        bubble.appendChild(senderEl);
     }
 
     if (m.forwardedFrom) bubble.appendChild(h("div", { class: "msg-forward" }, "Переслано от ", h("b", { text: m.forwardedFrom })));
@@ -367,8 +379,7 @@ function buildMessage(m, isGroup) {
     const reactions = Object.entries(m.reactions || {}).filter(function (pair) { return pair[1] && Object.keys(pair[1]).length; });
     if (reactions.length) {
         bubble.appendChild(h("div", { class: "reactions" }, reactions.map(function (pair) {
-            const emoji = pair[0];
-            const users = pair[1];
+            const emoji = pair[0], users = pair[1];
             return h("button", { class: "reaction " + (users[uid] ? "mine" : ""), onclick: function (e) { e.stopPropagation(); toggleReaction(m, emoji); } },
                 h("span", { class: "r-emoji", text: emoji }), Object.keys(users).length);
         })));
@@ -395,13 +406,8 @@ function buildVoice(m) {
     const btn = h("button", { class: "voice-btn", "aria-label": "Воспроизвести" }, icon("play"));
     const time = h("span", { class: "voice-time", text: formatDuration(m.duration) });
     let audio = null;
-    const paint = function (ratio) {
-        wave.querySelectorAll("i").forEach(function (bar, i) { bar.classList.toggle("played", i / bars < ratio); });
-    };
-    const setIcon = function (playing) {
-        btn.replaceChildren(icon(playing ? "pause" : "play"));
-        btn.setAttribute("aria-label", playing ? "Пауза" : "Воспроизвести");
-    };
+    const paint = function (ratio) { wave.querySelectorAll("i").forEach(function (bar, i) { bar.classList.toggle("played", i / bars < ratio); }); };
+    const setIcon = function (playing) { btn.replaceChildren(icon(playing ? "pause" : "play")); btn.setAttribute("aria-label", playing ? "Пауза" : "Воспроизвести"); };
     const ensure = function () {
         if (audio) return audio;
         audio = new Audio(m.data);
@@ -442,31 +448,19 @@ function buildRoundVideo(m) {
     const timeEl = h("span", { class: "rv-time", text: formatDuration(m.duration) });
     const loadingEl = h("span", { class: "rv-loading hidden" });
     const errorEl = h("span", { class: "rv-error hidden" }, "Ошибка");
-
     wrap.append(video, playIcon, timeEl, loadingEl, errorEl);
-
     let loaded = false;
     let blobUrl = null;
-
     const ensureLoaded = function () {
         if (loaded) return;
         loaded = true;
         try {
-            if (typeof m.data === "string" && (m.data.indexOf("http://") === 0 || m.data.indexOf("https://") === 0)) {
-                video.src = m.data;
-            } else if (isVideoDataUrl(m.data)) {
-                blobUrl = dataUrlToBlobUrl(m.data);
-                video.src = blobUrl;
-            } else {
-                video.src = m.data;
-            }
+            if (typeof m.data === "string" && (m.data.indexOf("http://") === 0 || m.data.indexOf("https://") === 0)) video.src = m.data;
+            else if (isVideoDataUrl(m.data)) { blobUrl = dataUrlToBlobUrl(m.data); video.src = blobUrl; }
+            else video.src = m.data;
             video.load();
-        } catch (err) {
-            console.warn("[localgram] ensureLoaded failed:", err);
-            errorEl.classList.remove("hidden");
-        }
+        } catch (err) { errorEl.classList.remove("hidden"); }
     };
-
     const togglePlay = async function (e) {
         if (e) e.stopPropagation();
         ensureLoaded();
@@ -474,42 +468,20 @@ function buildRoundVideo(m) {
             if (currentAudio) currentAudio.pause();
             loadingEl.classList.remove("hidden");
             errorEl.classList.add("hidden");
-            try {
-                await video.play();
-                wrap.classList.add("playing");
-            } catch (err) {
-                console.warn("[localgram] play error:", err);
-                errorEl.classList.remove("hidden");
-                setTimeout(function () { errorEl.classList.add("hidden"); }, 2000);
-            } finally {
-                loadingEl.classList.add("hidden");
-            }
-        } else {
-            video.pause();
-            wrap.classList.remove("playing");
-        }
+            try { await video.play(); wrap.classList.add("playing"); }
+            catch (err) { errorEl.classList.remove("hidden"); setTimeout(function () { errorEl.classList.add("hidden"); }, 2000); }
+            finally { loadingEl.classList.add("hidden"); }
+        } else { video.pause(); wrap.classList.remove("playing"); }
     };
-
     wrap.addEventListener("click", togglePlay);
     video.addEventListener("click", function (e) { e.stopPropagation(); });
-    video.addEventListener("ended", function () {
-        wrap.classList.remove("playing");
-        video.currentTime = 0;
-        timeEl.textContent = formatDuration(m.duration);
-    });
-    video.addEventListener("timeupdate", function () {
-        timeEl.textContent = formatDuration(video.currentTime || 0);
-    });
+    video.addEventListener("ended", function () { wrap.classList.remove("playing"); video.currentTime = 0; timeEl.textContent = formatDuration(m.duration); });
+    video.addEventListener("timeupdate", function () { timeEl.textContent = formatDuration(video.currentTime || 0); });
     video.addEventListener("loadedmetadata", function () {
         if (video.duration && isFinite(video.duration)) timeEl.textContent = formatDuration(video.duration);
         else timeEl.textContent = formatDuration(m.duration);
     });
-    video.addEventListener("error", function () {
-        console.warn("[localgram] video error:", video.error);
-        loadingEl.classList.add("hidden");
-        errorEl.classList.remove("hidden");
-    });
-
+    video.addEventListener("error", function () { loadingEl.classList.add("hidden"); errorEl.classList.remove("hidden"); });
     const observer = new MutationObserver(function () {
         if (!document.body.contains(wrap)) {
             if (blobUrl) { try { URL.revokeObjectURL(blobUrl); } catch (e) {} blobUrl = null; }
@@ -517,7 +489,6 @@ function buildRoundVideo(m) {
         }
     });
     observer.observe(document.body, { childList: true, subtree: true });
-
     return wrap;
 }
 
@@ -536,13 +507,12 @@ function buildVideoFile(m) {
 
 function buildGiftMessage(m) {
     const wrap = h("div", { class: "gift-message" });
-    const emoji = h("span", { class: "gift-message-emoji", text: m.giftEmoji || "🎁" });
-    const info = h("div", { class: "gift-message-info" },
-        h("strong", { text: "Подарок" }),
-        h("span", { text: m.giftName || "Подарок" }),
-        h("small", {}, "⭐ " + (m.giftPrice || 0).toLocaleString("ru-RU"))
-    );
-    wrap.append(emoji, info);
+    wrap.append(
+        h("span", { class: "gift-message-emoji", text: m.giftEmoji || "🎁" }),
+        h("div", { class: "gift-message-info" },
+            h("strong", { text: "Подарок" }),
+            h("span", { text: m.giftName || "Подарок" }),
+            h("small", {}, "⭐ " + (m.giftPrice || 0).toLocaleString("ru-RU"))));
     if (m.giftMessage) wrap.appendChild(h("em", { class: "gift-message-text", text: '"' + m.giftMessage + '"' }));
     return wrap;
 }
@@ -552,25 +522,16 @@ function buildGiftMessage(m) {
 function buildNFTMessage(m) {
     const r = (typeof getRarity === "function") ? getRarity(m.nftRarity) : { id: "common", label: "Обычный", color: "#8a9aab" };
     const wrap = h("div", { class: "nft-message rarity-" + r.id });
-
     const imgWrap = h("div", { class: "nft-message-img-wrap" });
-    const img = h("img", {
-        class: "nft-message-img",
-        src: "pic_gift/" + m.nftId + "_" + m.nftRarity + ".png",
-        alt: m.nftName || "NFT",
-        onerror: function () { this.style.display = "none"; }
-    });
-    const emojiFallback = h("span", { class: "nft-message-emoji", text: m.nftEmoji || "🎁" });
-    imgWrap.append(img, emojiFallback);
-
+    imgWrap.append(
+        h("img", { class: "nft-message-img", src: "pic_gift/" + m.nftId + "_" + m.nftRarity + ".png", alt: m.nftName || "NFT", onerror: function () { this.style.display = "none"; } }),
+        h("span", { class: "nft-message-emoji", text: m.nftEmoji || "🎁" }));
     const info = h("div", { class: "nft-message-info" },
         h("div", { class: "nft-message-label" }, "NFT-подарок"),
         h("div", { class: "nft-message-name", text: m.nftName || "NFT" }),
         h("div", { class: "nft-message-rarity", style: "color:" + r.color, text: r.label }),
         h("div", { class: "nft-message-serial", text: "№" + (m.nftSerial || "?") + "/" + (m.nftSupply || "?") }),
-        h("div", { class: "nft-message-price", text: "⭐ " + (m.nftPrice || 0).toLocaleString("ru-RU") })
-    );
-
+        h("div", { class: "nft-message-price", text: "⭐ " + (m.nftPrice || 0).toLocaleString("ru-RU") }));
     wrap.append(imgWrap, info);
     if (m.nftMessage) wrap.appendChild(h("em", { class: "nft-message-text", text: '"' + m.nftMessage + '"' }));
     return wrap;
@@ -660,11 +621,9 @@ function openMessageMenu(m, e) {
     const entry = state.activeChat;
     const pinned = entry && entry.pinnedMsg && entry.pinnedMsg.id === m.id;
     const canEdit = out && !m.forwardedFrom && (m.type ? true : !!m.text) && m.type !== "voice" && m.type !== "video" && m.type !== "videoFile" && m.type !== "gift" && m.type !== "nft";
-
     const reactRow = h("div", { class: "ctx-reactions" }, QUICK_REACTIONS.map(function (emoji) {
         return h("button", { "aria-label": "Реакция " + emoji, text: emoji, onclick: function () { hideMenu(); toggleReaction(m, emoji); } });
     }));
-
     showMenu([
         { label: "Ответить", icon: "reply", onClick: function () { setReply(m); } },
         canEdit ? { label: "Изменить", icon: "edit", onClick: function () { setEdit(m); } } : null,
@@ -680,9 +639,7 @@ function openMessageMenu(m, e) {
 
 function downloadData(data, name) {
     const a = h("a", { href: data, download: name });
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    document.body.appendChild(a); a.click(); a.remove();
 }
 
 async function toggleReaction(m, emoji) {
@@ -691,7 +648,7 @@ async function toggleReaction(m, emoji) {
     const updates = {};
     const had = m.reactions && m.reactions[emoji] && m.reactions[emoji][uid];
     Object.entries(m.reactions || {}).forEach(function (pair) {
-        const e = pair[0]; const users = pair[1];
+        const e = pair[0], users = pair[1];
         if (users && users[uid]) updates[base + "/" + e + "/" + uid] = null;
     });
     if (!had) updates[base + "/" + emoji + "/" + uid] = true;
@@ -706,9 +663,7 @@ async function togglePin(m) {
         await Promise.all(chatMembers(state.activeChat, chatId).map(function (uid) {
             return db.ref("user_chats/" + uid + "/" + chatId + "/pinnedMsg").set(value).catch(function () {});
         }));
-        if (!pinned && state.activeChat.type === "group") {
-            await pushMessage(chatId, { type: "system", text: state.profile.nickname + " закрепил(а) сообщение" });
-        }
+        if (!pinned && state.activeChat.type === "group") await pushMessage(chatId, { type: "system", text: state.profile.nickname + " закрепил(а) сообщение" });
         toast(pinned ? "Откреплено" : "Закреплено");
     } catch (error) { toast(friendlyError(error)); }
 }
@@ -718,8 +673,7 @@ async function deleteMessage(m) {
     const out = m.senderId === state.user.uid;
     const canForAll = entry.type === "saved" || out || entry.type === "private" || entry.ownerId === state.user.uid;
     const res = await confirmDialog({
-        title: "Удалить сообщение",
-        text: "Вы точно хотите удалить это сообщение?",
+        title: "Удалить сообщение", text: "Вы точно хотите удалить это сообщение?",
         ok: "Удалить", danger: true,
         checkbox: canForAll && entry.type !== "saved" ? (entry.type === "group" ? "Удалить для всех" : "Также удалить у " + chatTitle(entry)) : null,
     });
@@ -768,20 +722,13 @@ function openForward(m) {
     const list = h("div", { class: "pick-list" });
     const render = function () {
         const q = search.value.trim().toLowerCase();
-        const items = sortedChats(function (id, e) { return chatTitle(e).toLowerCase().includes(q); });
+        const items = sortedChats(function (id, e) { return chatTitle(e).toLowerCase().indexOf(q) >= 0; });
         list.replaceChildren.apply(list, items.map(function (pair) {
-            const id = pair[0]; const e = pair[1];
-            return h("button", {
-                class: "pick-row",
-                onclick: async function () {
-                    try {
-                        await pushMessage(id, forwardPayload(m));
-                        closeModal();
-                        toast("Переслано");
-                        openChat(id);
-                    } catch (error) { toast(friendlyError(error)); }
-                },
-            }, chatAvatar(e, "small"), h("span", { class: "m-text" }, h("strong", { text: chatTitle(e) })));
+            const id = pair[0], e = pair[1];
+            return h("button", { class: "pick-row", onclick: async function () {
+                try { await pushMessage(id, forwardPayload(m)); closeModal(); toast("Переслано"); openChat(id); }
+                catch (error) { toast(friendlyError(error)); }
+            }}, chatAvatar(e, "small"), h("span", { class: "m-text" }, h("strong", { text: chatTitle(e) })));
         }));
         if (!items.length) list.appendChild(h("div", { class: "list-empty", text: "Чаты не найдены" }));
     };
@@ -804,7 +751,7 @@ function runChatSearch() {
     const q = $("chatSearchInput").value.trim().toLowerCase();
     chatSearch.query = q;
     chatSearch.hits = q ? state.messages.filter(function (m) {
-        return m.type !== "system" && (m.text || m.fileName || "").toLowerCase().includes(q);
+        return m.type !== "system" && (m.text || m.fileName || "").toLowerCase().indexOf(q) >= 0;
     }).map(function (m) { return m.id; }) : [];
     chatSearch.index = chatSearch.hits.length - 1;
     applyChatSearchMarks(true);
@@ -817,7 +764,7 @@ function stepChatSearch(dir) {
 function applyChatSearchMarks(scroll) {
     const box = $("messages");
     box.querySelectorAll(".search-hit, .search-current").forEach(function (n) { n.classList.remove("search-hit", "search-current"); });
-    const hits = chatSearch.hits; const index = chatSearch.index; const query = chatSearch.query;
+    const hits = chatSearch.hits, index = chatSearch.index, query = chatSearch.query;
     $("chatSearchCount").textContent = query ? (hits.length ? (index + 1) + " из " + hits.length : "Нет") : "";
     hits.forEach(function (id, i) {
         const node = box.querySelector('.msg[data-id="' + CSS.escape(id) + '"]');

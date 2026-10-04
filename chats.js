@@ -26,6 +26,7 @@ function previewOf(msg) {
         videoFile: "Видео",
         file: msg.fileName ? "Файл: " + msg.fileName : "Файл",
         gift: "🎁 " + (msg.giftName || "Подарок"),
+        nft: "🎁 NFT: " + (msg.nftName || "Подарок"),
     };
     if (msg.type && kinds[msg.type]) return msg.text ? (kinds[msg.type] + ", " + msg.text) : kinds[msg.type];
     return (msg.text || "").replace(/\s+/g, " ").slice(0, 140);
@@ -38,7 +39,7 @@ function chatMembers(entry, chatId) {
     return [state.user.uid, entry.partnerId];
 }
 
-/* ===== USERNAME / USER LOOKUP ===== */
+/* ===== USERNAME LOOKUP ===== */
 
 function extractUidFromUsernameValue(val) {
     if (!val) return null;
@@ -49,39 +50,23 @@ function extractUidFromUsernameValue(val) {
 
 async function findUserByUsername(raw) {
     const username = normalizeUsername(raw);
-    if (!isValidUsername(username)) {
-        console.log("[search] невалидный username:", username);
-        return null;
-    }
-
+    if (!isValidUsername(username)) return null;
     let uid = null;
     try {
         const snap = await db.ref("usernames/" + username).once("value");
         uid = extractUidFromUsernameValue(snap.val());
-    } catch (err) {
-        console.warn("[search] ошибка чтения usernames/" + username + ":", err.message);
-    }
-
+    } catch (err) {}
     if (uid) {
         const user = await getUser(uid);
         if (user) return user;
-        console.warn("[search] usernames/" + username + " указывает на несуществующий UID:", uid);
     }
-
     const found = Object.values(state.chats).find(function (e) {
         return e.type === "private" && normalizeUsername(e.partnerUsername || "") === username;
     });
     if (found && found.partnerId) {
-        console.log("[search] найден в моих чатах:", username, "→", found.partnerId);
-        try {
-            await db.ref("usernames/" + username).set(found.partnerId);
-            console.log("[search] usernames/" + username + " восстановлен");
-        } catch (e) {
-            console.warn("[search] не удалось восстановить usernames:", e.message);
-        }
+        try { await db.ref("usernames/" + username).set(found.partnerId); } catch (e) {}
         return getUser(found.partnerId);
     }
-
     return null;
 }
 
@@ -97,18 +82,10 @@ async function repairUsernamesFromChats() {
     });
     if (state.profile && state.profile.username) {
         const myUname = normalizeUsername(state.profile.username);
-        if (isValidUsername(myUname)) {
-            updates["usernames/" + myUname] = state.user.uid;
-            count++;
-        }
+        if (isValidUsername(myUname)) { updates["usernames/" + myUname] = state.user.uid; count++; }
     }
     if (!count) return;
-    try {
-        await db.ref().update(updates);
-        console.log("[repair] восстановлено " + count + " записей usernames");
-    } catch (e) {
-        console.warn("[repair] ошибка:", e.message);
-    }
+    try { await db.ref().update(updates); } catch (e) {}
 }
 
 /* ===== CHATS LIST ===== */
@@ -121,8 +98,7 @@ function listenChats() {
         state.chats = chats;
 
         Object.entries(chats).forEach(function (pair) {
-            const chatId = pair[0];
-            const entry = pair[1];
+            const chatId = pair[0], entry = pair[1];
             const last = entry.lastTimestamp || 0;
             const incoming = entry.lastSenderId && entry.lastSenderId !== state.user.uid;
             const isNew = chatsLoaded && prev[chatId] && last > (prev[chatId].lastTimestamp || 0) && incoming;
@@ -185,9 +161,7 @@ async function refreshUnread(chatId, entry) {
             if (m.senderId !== state.user.uid && m.type !== "system" && !(m.deletedFor && m.deletedFor[state.user.uid])) count++;
         });
         state.unread[chatId] = Math.max(count, 1);
-    } catch (e) {
-        state.unread[chatId] = 1;
-    }
+    } catch (e) { state.unread[chatId] = 1; }
     renderChatList();
 }
 
@@ -202,8 +176,7 @@ function markChatRead(chatId) {
 
 function totalUnread() {
     return Object.entries(state.chats).reduce(function (sum, pair) {
-        const id = pair[0];
-        const e = pair[1];
+        const id = pair[0], e = pair[1];
         return sum + ((!e.muted && !e.archived) ? unreadOf(id) : 0);
     }, 0);
 }
@@ -259,8 +232,8 @@ function renderChatList() {
 
     if (!items.length) {
         const text = {
-            all: ["Здесь пока пусто", "Нажмите на карандаш внизу, чтобы найти человека по username или создать группу."],
-            personal: ["Нет личных чатов", "Начните переписку через кнопку «Новое сообщение»."],
+            all: ["Здесь пока пусто", "Нажмите на карандаш внизу, чтобы найти человека по username."],
+            personal: ["Нет личных чатов", "Начните переписку через «Новое сообщение»."],
             groups: ["Нет групп", "Создайте группу через меню или кнопку внизу."],
             unread: ["Всё прочитано", "Новые сообщения появятся здесь."],
             archive: ["Архив пуст", "Архивируйте чат через контекстное меню."],
@@ -295,7 +268,12 @@ function chatItem(chatId, entry) {
         ];
     }
 
-    const titleEl = h("span", { class: "ci-title-name", text: chatTitle(entry) });
+    const titleEl = h("span", { class: "ci-title-name" });
+    if (entry.type === "private" && entry.partnerId && typeof prefixBadge === "function") {
+        const pref = prefixBadge(entry.partnerId);
+        if (pref) titleEl.appendChild(pref);
+    }
+    titleEl.appendChild(h("span", { text: chatTitle(entry) }));
     if (entry.type === "private" && isVerifiedUser(entry.partnerUsername)) {
         titleEl.appendChild(verifiedBadge(14));
     }
@@ -360,8 +338,7 @@ async function deleteChat(chatId) {
     const res = await confirmDialog({
         title: "Удалить чат",
         text: "Вы точно хотите удалить чат " + (isPrivate ? "с " + chatTitle(entry) : "«Избранное»") + "?",
-        ok: "Удалить",
-        danger: true,
+        ok: "Удалить", danger: true,
         checkbox: isPrivate ? "Также удалить для " + chatTitle(entry) : null,
     });
     if (!res) return;
@@ -373,9 +350,7 @@ async function deleteChat(chatId) {
             if (res.checked) await db.ref("user_chats/" + entry.partnerId + "/" + chatId).remove().catch(function () {});
         }
         toast("Чат удалён");
-    } catch (error) {
-        toast(friendlyError(error));
-    }
+    } catch (error) { toast(friendlyError(error)); }
 }
 
 async function startPrivateChat(user) {
@@ -391,9 +366,7 @@ async function startPrivateChat(user) {
                 partnerUsername: user.username,
                 partnerAvatarUrl: user.avatarUrl || "",
                 partnerBio: user.bio || "",
-                lastMessage: "",
-                lastTimestamp: now,
-                readAt: now,
+                lastMessage: "", lastTimestamp: now, readAt: now,
             });
             await db.ref("user_chats/" + user.uid + "/" + chatId).update({
                 type: "private",
@@ -404,9 +377,7 @@ async function startPrivateChat(user) {
                 partnerBio: state.profile.bio || "",
             }).catch(function () {});
             state.chats[chatId] = (await db.ref("user_chats/" + state.user.uid + "/" + chatId).once("value")).val();
-        } catch (error) {
-            return toast(friendlyError(error));
-        }
+        } catch (error) { return toast(friendlyError(error)); }
     }
     closeSearch();
     closeModal();
@@ -435,16 +406,12 @@ async function createGroup(title, memberUsers, avatarUrl) {
     const base = { type: "group", title: title, avatarUrl: avatarUrl, ownerId: state.user.uid, members: members, createdAt: now, lastMessage: "Группа создана", lastTimestamp: now, lastSenderId: "system" };
     try {
         await db.ref("user_chats/" + state.user.uid + "/" + groupId).set(Object.assign({}, base, { readAt: now }));
-        await Promise.all(memberUsers.map(function (u) {
-            return db.ref("user_chats/" + u.uid + "/" + groupId).set(base).catch(function () {});
-        }));
+        await Promise.all(memberUsers.map(function (u) { return db.ref("user_chats/" + u.uid + "/" + groupId).set(base).catch(function () {}); }));
         await db.ref("private_messages/" + groupId).push({ type: "system", text: state.profile.nickname + " создал(а) группу «" + title + "»", senderId: "system", timestamp: now });
         state.chats[groupId] = Object.assign({}, base, { readAt: now });
         closeModal();
         openChat(groupId);
-    } catch (error) {
-        toast(friendlyError(error));
-    }
+    } catch (error) { toast(friendlyError(error)); }
 }
 
 async function addGroupMembers(groupId, users) {
@@ -459,15 +426,11 @@ async function addGroupMembers(groupId, users) {
     try {
         await db.ref().update(updates);
         const base = { type: "group", title: entry.title, avatarUrl: entry.avatarUrl || "", ownerId: entry.ownerId, members: members, createdAt: entry.createdAt || Date.now(), lastMessage: entry.lastMessage || "", lastTimestamp: Date.now() };
-        await Promise.all(users.map(function (u) {
-            return db.ref("user_chats/" + u.uid + "/" + groupId).set(base).catch(function () {});
-        }));
+        await Promise.all(users.map(function (u) { return db.ref("user_chats/" + u.uid + "/" + groupId).set(base).catch(function () {}); }));
         const names = users.map(function (u) { return u.nickname || u.username; }).join(", ");
         await pushMessage(groupId, { type: "system", text: state.profile.nickname + " добавил(а) " + names });
         toast(users.length > 1 ? "Участники добавлены" : "Участник добавлен");
-    } catch (error) {
-        toast(friendlyError(error));
-    }
+    } catch (error) { toast(friendlyError(error)); }
 }
 
 async function leaveGroup(groupId) {
@@ -484,9 +447,7 @@ async function leaveGroup(groupId) {
         await db.ref().update(updates).catch(function () {});
         if (groupId === state.activeChatId) closeChat();
         await db.ref("user_chats/" + state.user.uid + "/" + groupId).remove();
-    } catch (error) {
-        toast(friendlyError(error));
-    }
+    } catch (error) { toast(friendlyError(error)); }
 }
 
 /* ===== SEARCH ===== */
@@ -494,41 +455,34 @@ async function leaveGroup(groupId) {
 const runGlobalSearch = debounce(async function (query) {
     const box = $("globalResults");
     if (!box) return;
-
     const username = normalizeUsername(query);
     const input = $("searchInput");
     if (!input) return;
-
     if (username.length < 3) {
-        box.replaceChildren(h("div", { class: "list-empty", text: "Введите username (от 3 символов) для глобального поиска." }));
+        box.replaceChildren(h("div", { class: "list-empty", text: "Введите username (от 3 символов)." }));
         return;
     }
-
-    console.log("[search] глобальный поиск:", username);
     box.replaceChildren(h("div", { class: "list-empty", text: "Поиск…" }));
-
     try {
         const user = await findUserByUsername(username);
         if ($("searchInput").value.trim() !== query) return;
-
         if (!user) {
-            box.replaceChildren(
-                h("div", { class: "list-empty" },
-                    h("strong", { text: "@" + username + " не найден" }),
-                    "Пользователь либо не зарегистрирован, либо ещё не создал username.")
-            );
+            box.replaceChildren(h("div", { class: "list-empty" }, h("strong", { text: "@" + username + " не найден" }), "Пользователь не зарегистрирован."));
             return;
         }
-
         box.replaceChildren(userRow(user, function () { startPrivateChat(user); }));
     } catch (error) {
-        console.error("[search] ошибка:", error);
         box.replaceChildren(h("div", { class: "list-empty", text: friendlyError(error) }));
     }
 }, 300);
 
 function userRow(user, onClick, extra) {
-    const nameEl = h("strong", { text: user.nickname || user.username });
+    const nameEl = h("strong", {});
+    if (typeof prefixBadge === "function") {
+        const pref = prefixBadge(user.uid);
+        if (pref) nameEl.appendChild(pref);
+    }
+    nameEl.appendChild(h("span", { text: user.nickname || user.username }));
     if (isVerifiedUser(user.username)) nameEl.appendChild(verifiedBadge(15));
     return h("button", { class: "member-row", onclick: onClick },
         avatarEl(user.nickname || user.username, user.avatarUrl, "", { key: user.uid }),
@@ -540,61 +494,54 @@ function renderSearch() {
     const input = $("searchInput");
     const panel = $("searchPanel");
     if (!input || !panel) return;
-
     const query = input.value.trim();
     const q = query.toLowerCase().replace(/^@/, "");
 
     if (!query) {
         const recent = sortedChats(function () { return true; }).slice(0, 12);
         if (!recent.length) {
-            panel.replaceChildren(h("div", { class: "list-empty" },
-                h("strong", { text: "Ничего нет" }),
-                "Найдите человека по @username — введите имя в поле выше."));
+            panel.replaceChildren(h("div", { class: "list-empty" }, h("strong", { text: "Ничего нет" }), "Найдите человека по @username."));
             return;
         }
         const nodes = [h("div", { class: "section-title", text: "Недавние" })];
         recent.forEach(function (pair) {
-            const id = pair[0];
-            const e = pair[1];
-            const nameEl = h("strong", { text: chatTitle(e) });
+            const id = pair[0], e = pair[1];
+            const nameEl = h("strong", {});
+            if (e.type === "private" && e.partnerId && typeof prefixBadge === "function") {
+                const pref = prefixBadge(e.partnerId);
+                if (pref) nameEl.appendChild(pref);
+            }
+            nameEl.appendChild(h("span", { text: chatTitle(e) }));
             if (e.type === "private" && isVerifiedUser(e.partnerUsername)) nameEl.appendChild(verifiedBadge(14));
-            nodes.push(h("button", {
-                class: "member-row",
-                onclick: function () { closeSearch(); openChat(id); }
-            },
+            nodes.push(h("button", { class: "member-row", onclick: function () { closeSearch(); openChat(id); } },
                 chatAvatar(e),
                 h("span", { class: "m-text" }, nameEl,
-                    h("small", {
-                        text: e.type === "group"
-                            ? Object.keys(e.members || {}).length + " участников"
-                            : (e.partnerUsername ? "@" + e.partnerUsername : "")
-                    }))
-            ));
+                    h("small", { text: e.type === "group" ? Object.keys(e.members || {}).length + " участников" : (e.partnerUsername ? "@" + e.partnerUsername : "") }))));
         });
         panel.replaceChildren.apply(panel, nodes);
         return;
     }
 
     const local = sortedChats(function (id, e) {
-        return chatTitle(e).toLowerCase().includes(q) || (e.partnerUsername || "").toLowerCase().includes(q);
+        return chatTitle(e).toLowerCase().indexOf(q) >= 0 || (e.partnerUsername || "").toLowerCase().indexOf(q) >= 0;
     });
 
     const nodes = [];
     if (local.length) {
         nodes.push(h("div", { class: "section-title", text: "Чаты" }));
         local.forEach(function (pair) {
-            const id = pair[0];
-            const e = pair[1];
-            const nameEl = h("strong", { text: chatTitle(e) });
+            const id = pair[0], e = pair[1];
+            const nameEl = h("strong", {});
+            if (e.type === "private" && e.partnerId && typeof prefixBadge === "function") {
+                const pref = prefixBadge(e.partnerId);
+                if (pref) nameEl.appendChild(pref);
+            }
+            nameEl.appendChild(h("span", { text: chatTitle(e) }));
             if (e.type === "private" && isVerifiedUser(e.partnerUsername)) nameEl.appendChild(verifiedBadge(14));
-            nodes.push(h("button", {
-                class: "member-row",
-                onclick: function () { closeSearch(); openChat(id); }
-            },
+            nodes.push(h("button", { class: "member-row", onclick: function () { closeSearch(); openChat(id); } },
                 chatAvatar(e),
                 h("span", { class: "m-text" }, nameEl,
-                    h("small", { text: e.partnerUsername ? "@" + e.partnerUsername : (e.type === "group" ? "группа" : "") }))
-            ));
+                    h("small", { text: e.partnerUsername ? "@" + e.partnerUsername : (e.type === "group" ? "группа" : "") }))));
         });
     }
 

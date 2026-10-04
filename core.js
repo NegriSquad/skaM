@@ -3,61 +3,27 @@ let auth = null;
 
 const SETTINGS_KEY = "localgram_settings";
 const DEFAULT_SETTINGS = {
-    theme: "dark",
-    fontSize: 15,
-    sendByEnter: true,
-    notifications: true,
-    recordMode: "voice",
-    sound: true,
-    vibrate: true,
-    preview: true,
-    notifyPrivate: true,
-    notifyGroups: true,
-    notifySaved: false,
-    inAppSound: true,
-    inAppVibrate: true,
-    inAppPreview: true,
-    lastSeen: "everyone",
-    profilePhoto: "everyone",
-    bioVisibility: "everyone",
-    callsFrom: "everyone",
-    groupsFrom: "everyone",
-    readReceipts: true,
-    forwardLink: true,
-    sensitiveContent: false,
-    cacheLifetime: "1w",
-    autoDownloadPhotos: "always",
-    autoDownloadVideos: "wifi",
-    autoDownloadFiles: "wifi",
-    autoDownloadVoice: "always",
-    saveTraffic: false,
-    cornerRadius: 12,
-    chatWallpaper: "",
-    swipeAction: "archive",
-    language: "ru",
-    stickerSuggestions: true,
+    theme: "dark", fontSize: 15, sendByEnter: true, notifications: true, recordMode: "voice",
+    sound: true, vibrate: true, preview: true,
+    notifyPrivate: true, notifyGroups: true, notifySaved: false,
+    inAppSound: true, inAppVibrate: true, inAppPreview: true,
+    lastSeen: "everyone", profilePhoto: "everyone", bioVisibility: "everyone", callsFrom: "everyone", groupsFrom: "everyone",
+    readReceipts: true, forwardLink: true, sensitiveContent: false,
+    cacheLifetime: "1w", autoDownloadPhotos: "always", autoDownloadVideos: "wifi", autoDownloadFiles: "wifi", autoDownloadVoice: "always",
+    saveTraffic: false, cornerRadius: 12, chatWallpaper: "", swipeAction: "archive", language: "ru", stickerSuggestions: true,
+    requirePaymentForStrangers: false, paidMessagePrice: 5,
+    hidePattern: false, compactMode: false, animationEnabled: true, timeFormat24: true, reactionsEnabled: true,
+    accentColor: "",
 };
 
 const state = {
-    user: null,
-    profile: null,
-    chats: {},
-    unread: {},
-    activeChatId: null,
-    activeChat: null,
-    partner: null,
-    messages: [],
-    msgLimit: 100,
-    folder: "all",
-    replyTo: null,
-    editing: null,
-    drafts: {},
-    typing: {},
-    presence: {},
+    user: null, profile: null, chats: {}, unread: {},
+    activeChatId: null, activeChat: null, partner: null,
+    messages: [], msgLimit: 100, folder: "all",
+    replyTo: null, editing: null, drafts: {}, typing: {}, presence: {},
     settings: loadSettings(),
-    stars: 0,
-    isAdmin: false,
-    verifiedUsers: new Set(),
+    stars: 0, isAdmin: false, verifiedUsers: new Set(),
+    prefixes: {},
 };
 
 const listenerGroups = {};
@@ -93,12 +59,26 @@ function applySettings() {
     document.documentElement.style.setProperty("--msg-size", s.fontSize + "px");
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute("content", s.theme === "dark" ? "#17212b" : "#ffffff");
-    if (s.cornerRadius) document.documentElement.style.setProperty("--radius", s.cornerRadius + "px");
-    if (s.chatWallpaper && typeof applyWallpaperColors === "function") {
-        applyWallpaperColors(s.chatWallpaper);
-    }
+    if (s.cornerRadius !== undefined) document.documentElement.style.setProperty("--radius", s.cornerRadius + "px");
+    if (s.chatWallpaper && typeof applyWallpaperColors === "function") applyWallpaperColors(s.chatWallpaper);
     const toggle = $("nightToggle");
     if (toggle) toggle.checked = s.theme === "dark";
+    if (typeof applyCustomization === "function") applyCustomization();
+}
+
+function applyCustomization() {
+    const s = state.settings;
+    const root = document.documentElement;
+    root.classList.toggle("hide-pattern", !!s.hidePattern);
+    root.classList.toggle("compact-mode", !!s.compactMode);
+    root.classList.toggle("no-animation", s.animationEnabled === false);
+    if (s.accentColor) {
+        root.style.setProperty("--accent", s.accentColor);
+        root.style.setProperty("--accent-2", s.accentColor);
+    } else {
+        root.style.removeProperty("--accent");
+        root.style.removeProperty("--accent-2");
+    }
 }
 
 function initFirebase(config) {
@@ -118,12 +98,15 @@ function friendlyError(error) {
         "auth/weak-password": "Слишком простой пароль (минимум 6 символов).",
         "auth/too-many-requests": "Слишком много попыток. Попробуйте позже.",
         "auth/network-request-failed": "Нет соединения с сервером.",
+        "auth/requires-recent-login": "Требуется повторный вход. Выйдите и войдите снова.",
         "auth/api-key-not-valid.-please-pass-a-valid-api-key.": "Неверный API-ключ Firebase.",
     };
     if (error && error.code && map[error.code]) return map[error.code];
-    if (String(error && error.message || "").includes("permission_denied")) return "Нет доступа. Проверьте правила безопасности Firebase.";
-    return error && error.message || "Неизвестная ошибка";
+    if (String(error && error.message || "").indexOf("permission_denied") >= 0) return "Нет доступа. Проверьте правила безопасности Firebase.";
+    return (error && error.message) || "Неизвестная ошибка";
 }
+
+/* ===== AUTH ===== */
 
 function showAuth(mode) {
     mode = mode || "login";
@@ -174,42 +157,56 @@ async function handleRegister(e) {
 
     const btn = form.querySelector(".tg-btn.primary");
     btn.disabled = true;
+    let createdUser = null;
 
     try {
-        let taken = null;
-        try {
-            const snap = await db.ref("usernames/" + username).once("value");
-            taken = snap.val();
-        } catch (err) {
-            console.warn("[localgram] username check failed:", err.message);
-        }
-        if (taken) {
+        const cred = await auth.createUserWithEmailAndPassword(email, password);
+        createdUser = cred.user;
+        try { await createdUser.getIdToken(true); } catch (e) {}
+
+        const unameRef = db.ref("usernames/" + username);
+        const tx = await unameRef.transaction(function (cur) {
+            if (cur === null) return createdUser.uid;
+            return;
+        });
+        if (!tx.committed) {
+            try { await createdUser.delete(); } catch (e) {}
             authError(form, "Этот username уже занят.");
             return;
         }
 
-        const cred = await auth.createUserWithEmailAndPassword(email, password);
-        const user = cred.user;
-
-        try { await user.getIdToken(true); } catch (e) {}
-
         const profile = {
             email: email, username: username, nickname: nickname,
-            avatarUrl: "", bio: "",
+            avatarUrl: "", bio: "", birthday: "",
             createdAt: Date.now(), updatedAt: Date.now(),
         };
-
-        await db.ref("users/" + user.uid).set(profile);
-        await db.ref("usernames/" + username).set(user.uid);
-
+        await db.ref("users/" + createdUser.uid).set(profile);
         state.profile = profile;
-        console.log("[localgram] registration complete for uid:", user.uid);
     } catch (error) {
-        console.error("[localgram] register error:", error);
+        if (createdUser) {
+            try { await db.ref("usernames/" + username).remove(); } catch (e) {}
+            try { await createdUser.delete(); } catch (e) {}
+        }
         authError(form, friendlyError(error));
     } finally {
         btn.disabled = false;
     }
+}
+
+async function ensureOwnUsername() {
+    if (!state.profile || !state.profile.username || !state.user) return;
+    const uname = normalizeUsername(state.profile.username);
+    if (!isValidUsername(uname)) return;
+    try {
+        const ref = db.ref("usernames/" + uname);
+        const snap = await ref.once("value");
+        const cur = snap.val();
+        if (cur === state.user.uid) return;
+        const tx = await ref.transaction(function (current) {
+            if (current === null || current === state.user.uid) return state.user.uid;
+            return;
+        });
+    } catch (e) {}
 }
 
 async function handleAuthState(user) {
@@ -224,6 +221,7 @@ async function handleAuthState(user) {
         state.stars = 0;
         state.isAdmin = false;
         state.verifiedUsers = new Set();
+        state.prefixes = {};
         closeChat();
         showAuth("login");
         return;
@@ -235,14 +233,10 @@ async function handleAuthState(user) {
             const snap = await db.ref("users/" + user.uid).once("value");
             profile = snap.val();
             if (profile) break;
-        } catch (err) {
-            console.warn("[localgram] profile read attempt " + (i + 1) + ":", err.message);
-        }
+        } catch (err) {}
         await new Promise(function (r) { setTimeout(r, 500); });
     }
-
     if (!profile) {
-        console.warn("[localgram] profile not found after 5 attempts");
         toast("Профиль не найден. Войдите снова.");
         showAuth("login");
         return;
@@ -251,18 +245,21 @@ async function handleAuthState(user) {
     state.profile = profile;
     state.isAdmin = isAdminUser(profile.username);
 
-    // Загружаем список верифицированных
+    // Синхронизация платных сообщений
+    if (profile.requirePaymentForStrangers !== undefined) {
+        state.settings.requirePaymentForStrangers = !!profile.requirePaymentForStrangers;
+    }
+    if (profile.paidMessagePrice !== undefined) {
+        state.settings.paidMessagePrice = Number(profile.paidMessagePrice) || 5;
+    }
+    saveSettings();
+
     try {
         const vSnap = await db.ref("config/verified").once("value");
-        const vVal = vSnap.val() || {};
-        state.verifiedUsers = new Set(Object.keys(vVal));
-    } catch (e) {
-        console.warn("[localgram] verified list load failed:", e.message);
-        state.verifiedUsers = new Set();
-    }
+        state.verifiedUsers = new Set(Object.keys(vSnap.val() || {}));
+    } catch (e) { state.verifiedUsers = new Set(); }
     DEFAULT_VERIFIED.forEach(function (u) { state.verifiedUsers.add(u); });
 
-    // Загружаем баланс звёзд
     try {
         const sSnap = await db.ref("users/" + user.uid + "/stars").once("value");
         state.stars = Number(sSnap.val()) || 0;
@@ -272,6 +269,7 @@ async function handleAuthState(user) {
     $("app").classList.remove("hidden");
     renderDrawerProfile();
     startPresence();
+    ensureOwnUsername().catch(function () {});
 
     listen("global", db.ref("users/" + user.uid), "value", function (snap) {
         if (!snap.val()) return;
@@ -281,8 +279,8 @@ async function handleAuthState(user) {
         toggleAdminButtonVisibility();
     });
     listenChats();
-
     if (typeof listenStars === "function") listenStars();
+    listenPrefixes();
 
     toggleAdminButtonVisibility();
 }
@@ -316,6 +314,7 @@ async function logout() {
     try { if (typeof closeProfilePanel === "function") closeProfilePanel(); } catch (e) {}
     try { if (typeof closeAdminPanel === "function") closeAdminPanel(); } catch (e) {}
     try { if (typeof closeGiftsPanel === "function") closeGiftsPanel(); } catch (e) {}
+    try { if (typeof closeContactsPanel === "function") closeContactsPanel(); } catch (e) {}
     await auth.signOut();
 }
 
@@ -361,32 +360,11 @@ function confirmDialog(opts) {
                 h("button", { class: "tg-btn link", onclick: function () { done(null); closeModal(); } }, "Отмена"),
                 h("button", {
                     class: "tg-btn " + (opts.danger ? "danger" : "link"),
-                    onclick: function () { done({ checked: check && check.checked || false }); closeModal(); }
+                    onclick: function () { done({ checked: (check && check.checked) || false }); closeModal(); }
                 }, opts.ok || "OK")
             ),
         ].filter(Boolean);
         openModal({ title: opts.title, body: body, onClose: function () { done(null); } });
-    });
-}
-
-function promptDialog(opts) {
-    return new Promise(function (resolve) {
-        let settled = false;
-        const done = function (v) { if (settled) return; settled = true; resolve(v); };
-        const input = h("input", { type: "text", placeholder: " ", maxlength: opts.maxLength || 64 });
-        input.value = opts.value || "";
-        const submit = function () { done(input.value.trim()); closeModal(); };
-        input.addEventListener("keydown", function (e) { if (e.key === "Enter" && !isComposingEvent(e)) submit(); });
-        openModal({
-            title: opts.title,
-            body: [
-                h("label", { class: "tg-field" }, input, h("span", { text: opts.label })),
-                h("div", { class: "modal-actions" },
-                    h("button", { class: "tg-btn link", onclick: function () { done(null); closeModal(); } }, "Отмена"),
-                    h("button", { class: "tg-btn link", onclick: submit }, opts.ok || "Сохранить")),
-            ],
-            onClose: function () { done(null); },
-        });
     });
 }
 
@@ -441,7 +419,51 @@ async function getUser(uid) {
 async function findUserByUsername(raw) {
     const username = normalizeUsername(raw);
     if (!isValidUsername(username)) return null;
-    const uid = (await db.ref("usernames/" + username).once("value")).val();
-    if (!uid) return null;
-    return getUser(uid);
+    let uid = null;
+    try {
+        const snap = await db.ref("usernames/" + username).once("value");
+        const val = snap.val();
+        if (typeof val === "string") uid = val;
+        else if (val && typeof val === "object" && typeof val.uid === "string") uid = val.uid;
+    } catch (err) {}
+    if (uid) {
+        const user = await getUser(uid);
+        if (user) return user;
+    }
+    const found = Object.values(state.chats).find(function (e) {
+        return e.type === "private" && normalizeUsername(e.partnerUsername || "") === username;
+    });
+    if (found && found.partnerId) return getUser(found.partnerId);
+    return null;
+}
+
+/* ===== PREFIXES ===== */
+
+const PREFIX_DEFS = {
+    admin: { label: "ADMIN", color: "#e53935" },
+    dev:   { label: "DEV",   color: "#3390ec" },
+    scam:  { label: "SCAM",  color: "#f59e0b" },
+    loh:   { label: "ЛОХ",   color: "#8d6e63" },
+};
+
+function listenPrefixes() {
+    const ref = db.ref("user_prefixes");
+    listen("global", ref, "value", function (snap) {
+        state.prefixes = snap.val() || {};
+        try { renderChatList(); } catch (e) {}
+        try { renderChatHeader(); } catch (e) {}
+        try { if ($("infoPanel") && !$("infoPanel").classList.contains("hidden")) renderInfoPanel(); } catch (e) {}
+    });
+}
+
+function prefixBadge(uid) {
+    if (!uid || !state.prefixes) return null;
+    const key = state.prefixes[uid];
+    if (!key || !PREFIX_DEFS[key]) return null;
+    const def = PREFIX_DEFS[key];
+    return h("span", {
+        class: "user-prefix user-prefix-" + key,
+        style: "background:" + def.color + ";",
+        text: def.label,
+    });
 }
